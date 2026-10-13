@@ -11,6 +11,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const jwt = url.searchParams.get("installation_receipt");
   if (!jwt) return NextResponse.json({ error: "missing installation_receipt" }, { status: 400 });
+  if (!env.originAppId) return NextResponse.json({ error: "ORIGIN_APP_ID is not configured yet" }, { status: 503 });
   try {
     const r = await verifyReceipt(jwt, env.originAppId);
     const store = getStore();

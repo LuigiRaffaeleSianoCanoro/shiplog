@@ -1,3 +1,6 @@
+/** Treat empty or "REPLACE_ME…" placeholders as unset. */
+const unset = (v?: string) => (!v || /^REPLACE/i.test(v) ? "" : v);
+
 /** Central, typed access to configuration. Never log values from here. */
 export const env = {
   /** "cursor" (production default) or "neon" (test mode: draft via Neon AI Gateway). */
@@ -5,8 +8,8 @@ export const env = {
   /** BYOK key collection is behind a flag until Cursor confirms policy (FAB-80). */
   byokEnabled: process.env.SHIPLOG_BYOK_ENABLED !== "false",
   encKey: process.env.SHIPLOG_KEY_ENC ?? "",
-  originAppId: process.env.ORIGIN_APP_ID ?? "",
-  originPrivateKey: (process.env.ORIGIN_APP_PRIVATE_KEY ?? "").replace(/\\n/g, "\n"),
+  originAppId: unset(process.env.ORIGIN_APP_ID),
+  originPrivateKey: unset(process.env.ORIGIN_APP_PRIVATE_KEY).replace(/\\n/g, "\n"),
   originApi: process.env.ORIGIN_API_BASE ?? "https://api.cursor.com/v1/origin",
   cursorApi: process.env.CURSOR_API_BASE ?? "https://api.cursor.com",
   neonBase: process.env.NEON_AI_GATEWAY_BASE_URL ?? "",
