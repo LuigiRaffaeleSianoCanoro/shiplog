@@ -35,7 +35,24 @@ cp .env.example .env.local   # fill values; openssl rand -base64 32 for SHIPLOG_
 SHIPLOG_LLM_PROVIDER=neon ORIGIN_APP_ID=app_local ORIGIN_JWKS_URL=http://127.0.0.1:4455/keys npm start &
 node scripts/e2e-local.mjs
 ```
-Storage: Supabase when `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are set (apply `supabase/migrations/0001_shiplog.sql`), otherwise a local JSON file (dev only).
+Storage: **Vercel Blob, private store `shiplog-store`** in production (free on Hobby; `BLOB_READ_WRITE_TOKEN` is injected when the store is connected to the project).
+- One JSON document per record under `shiplog/v1/`, with no public URLs; only server code holding the token can read it. That is the RLS / service-role-only equivalent.
+- Keys are AES-256-GCM sealed before they are written.
+- Delivery dedupe is atomic: `put` without `allowOverwrite` fails on an existing pathname.
+- Optional: Supabase when `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are set (`supabase/migrations/0001_shiplog.sql`). A local JSON file is used only outside Vercel, for dev.
+
+## Deployment (Vercel, team luigi-canoros-projects)
+Production: https://shiplog-luigi-canoros-projects.vercel.app. Vercel Authentication is off, so webhooks and pages are public.
+
+| Env var | Status |
+|---|---|
+| `SHIPLOG_KEY_ENC`, `CRON_SECRET`, `SHIPLOG_DASHBOARD_TOKEN` | generated, sensitive |
+| `SHIPLOG_LLM_PROVIDER=neon`, `SHIPLOG_NEON_MODEL`, `NEON_AI_GATEWAY_*` | test mode |
+| `SHIPLOG_BYOK_ENABLED=true` | set |
+| `BLOB_READ_WRITE_TOKEN` | from the connected Blob store |
+| `ORIGIN_APP_ID`, `ORIGIN_APP_PRIVATE_KEY` | **placeholders** (`REPLACE_ME…`, treated as unset). Fill them after creating the Origin App, then redeploy. Until then PR comments are recorded on the dashboard only, and `/api/install/callback` returns 503. |
+
+Origin App settings: webhook URL `https://shiplog-luigi-canoros-projects.vercel.app/api/webhooks/origin`, callback URL `https://shiplog-luigi-canoros-projects.vercel.app/api/install/callback`.
 
 Polling: Vercel Hobby cron runs once a day (`vercel.json`), and the dashboard also polls whenever it is viewed. For minute-level polling, use Supabase `pg_cron` + `pg_net` to call `/api/cron/poll` with `CRON_SECRET`.
 
