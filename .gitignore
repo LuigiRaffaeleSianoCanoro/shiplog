@@ -1,0 +1,7 @@
+node_modules
+.next
+.env*
+!.env.example
+.data
+*.pem
+next-env.d.ts
