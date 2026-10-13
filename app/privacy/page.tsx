@@ -1,7 +1,7 @@
 export default function Privacy() {
   return (
-    <main className="wrap" style={{ paddingTop: 40 }}>
-      <h1>Privacy & <span className="lime">what we store</span></h1>
+    <main className="wrap page" style={{ maxWidth: 820 }}>
+      <h1>Privacy & <span className="accent">what we store</span></h1>
       <div className="panel">
         <ul className="muted" style={{ lineHeight: 1.8 }}>
           <li>Installation id, namespace, status, and job history (PR number, link, outcome).</li>
