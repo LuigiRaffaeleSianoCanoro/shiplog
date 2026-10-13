@@ -64,7 +64,7 @@ Per https://cursor.com/docs/origin/apps/publish:
 
 ## Install (private app, owner namespace `luigi`)
 Use https://shiplog-luigi-canoros-projects.vercel.app/api/install/start. It sets an anti-forgery `state` cookie and redirects to:
-`https://cursor.com/codebase/apps/install?client_id=app_01m4vhdccyfywsqbd9v26h126w&scope=repository:pull_requests:read repository:pull_requests:reviews:read repository:pull_requests:reviews:write&redirect_uri=https://shiplog-luigi-canoros-projects.vercel.app/api/install/callback&state=…`
+`https://cursor.com/codebase/apps/install?client_id=app_01m4vhdccyfywsqbd9v26h126w&scope=repository:contents:read repository:contents:write repository:pull_requests:read repository:pull_requests:reviews:read repository:pull_requests:reviews:write&redirect_uri=https://shiplog-luigi-canoros-projects.vercel.app/api/install/callback&state=…&include_granted_scopes=true` (also the re-consent link for existing installs)
 (`client_id` is the Origin App ID; `repository:metadata:read` is added automatically.)
 
 ## Demo repo `luigi/shiplog-demo` (native Origin)
