@@ -10,7 +10,7 @@ export default function Home() {
           Shiplog turns every merged pull request on Cursor Origin into a Keep a Changelog entry, and every release into human-readable notes. Agents run on your own Cursor plan — no extra subscription.
         </p>
         <div className="row fade-up d3">
-          <Link className="btn primary" href="/setup">Install on Origin</Link>
+          <a className="btn primary" href="/api/install/start">Install on Origin</a>
           <Link className="btn" href="/dashboard">Open dashboard</Link>
         </div>
       </section>

@@ -45,6 +45,7 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
   const store = getStore();
   const { type, payload } = env_.event;
   const instId = env_.installationId;
+  if (type === "ping" || !instId) return null; // pings belong to no installation
   const now = new Date().toISOString();
 
   if (type === "installation.created" || type === "installation.unsuspended" || type === "installation.updated") {

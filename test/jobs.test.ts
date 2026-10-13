@@ -97,3 +97,14 @@ describe("llm content shapes", () => {
     expect(await chat("s", "u", f)).toBe("hi there");
   });
 });
+
+describe("ping", () => {
+  it("ignores Origin ping deliveries (no installation)", async () => {
+    vi.resetModules();
+    const { MemoryStore } = await import("@/lib/store/memory");
+    const storeMod = await import("@/lib/store"); const store = new MemoryStore(); storeMod.setStore(store);
+    const { handleEvent } = await import("@/lib/jobs");
+    expect(await handleEvent({ installationId: undefined as any, event: { type: "ping", payload: {} } }, "p1")).toBeNull();
+    expect(await store.listInstallations()).toHaveLength(0);
+  });
+});
