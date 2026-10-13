@@ -20,7 +20,7 @@ const write = (pathname: string, data: unknown) => put(pathname, JSON.stringify(
 
 async function readAll<T>(prefix: string, limit = 100): Promise<T[]> {
   const { blobs } = await list({ prefix, limit: 1000 });
-  const newest = blobs.sort((a, b) => b.pathname.localeCompare(a.pathname)).slice(0, limit);
+  const newest = blobs.sort((a, b) => a.pathname.localeCompare(b.pathname)).slice(0, limit); // rev() prefix: ascending = newest first
   return (await Promise.all(newest.map((b) => readJson<T>(b.pathname)))).filter(Boolean) as T[];
 }
 // Reverse-chronological sortable prefix so newest-first listing is a string sort.

@@ -38,7 +38,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           {!jobs.length && <tr><td colSpan={6} className="muted">Merge a PR to see Shiplog work.</td></tr>}
         </tbody></table>
       </div>
-      {outbox.length > 0 && <div className="panel fade-up d3"><h3>Latest PR comments</h3>{outbox.map((o) => <div key={o.id}><p className="muted">{o.repo} #{o.prNumber} {o.delivered ? "· posted to Origin" : "· recorded (Origin not configured)"}</p><pre>{o.body}</pre></div>)}</div>}
+      {outbox.length > 0 && <div className="panel fade-up d3"><h3>Latest PR comments</h3>{outbox.map((o) => <div key={o.id}><p className="muted">{o.repo} #{o.prNumber} {o.delivered ? "· posted to Origin" : !o.prNumber ? "· tag release (no PR to comment on)" : "· recorded (not posted)"}</p><pre>{o.body}</pre></div>)}</div>}
     </main>
   );
 }
