@@ -50,7 +50,7 @@ Production: https://shiplog-luigi-canoros-projects.vercel.app. Vercel Authentica
 | `SHIPLOG_LLM_PROVIDER=neon`, `SHIPLOG_NEON_MODEL`, `NEON_AI_GATEWAY_*` | test mode |
 | `SHIPLOG_BYOK_ENABLED=true` | set |
 | `BLOB_READ_WRITE_TOKEN` | from the connected Blob store |
-| `ORIGIN_APP_ID`, `ORIGIN_APP_PRIVATE_KEY` | **placeholders** (`REPLACE_ME…`, treated as unset). Fill them after creating the Origin App, then redeploy. Until then PR comments are recorded on the dashboard only, and `/api/install/callback` returns 503. |
+| `ORIGIN_APP_ID` (`app_01m4vhdccyfywsqbd9v26h126w`), `ORIGIN_APP_PRIVATE_KEY` | set, sensitive. App JWT verified live (`GET /v1/origin/app` returned 200), and a signed Origin ping was accepted (202). |
 
 Origin App settings: webhook URL `https://shiplog-luigi-canoros-projects.vercel.app/api/webhooks/origin`, callback URL `https://shiplog-luigi-canoros-projects.vercel.app/api/install/callback`.
 
@@ -61,3 +61,18 @@ Per https://cursor.com/docs/origin/apps/publish:
 1. Set the app to Public.
 2. Record a public 5–10 min demo video covering install (personal and team namespaces, all repos and selected repos) and uninstall from both sides (Origin settings, and the Shiplog dashboard showing Disconnected).
 3. Click Submit on the app settings page.
+
+## Install (private app, owner namespace `luigi`)
+Use https://shiplog-luigi-canoros-projects.vercel.app/api/install/start. It sets an anti-forgery `state` cookie and redirects to:
+`https://cursor.com/codebase/apps/install?client_id=app_01m4vhdccyfywsqbd9v26h126w&scope=repository:pull_requests:read repository:pull_requests:reviews:read repository:pull_requests:reviews:write&redirect_uri=https://shiplog-luigi-canoros-projects.vercel.app/api/install/callback&state=…`
+(`client_id` is the Origin App ID; `repository:metadata:read` is added automatically.)
+
+## Demo repo `luigi/shiplog-demo` (native Origin)
+The repo is created and empty. A local copy with 3 commits, a `v1.0.0` tag and a `CHANGELOG.md` is on the box at `/workspace/shiplog-demo`. To push it from a machine with Origin git access:
+```bash
+cd shiplog-demo && git push -u origin main --tags   # remote: https://origin.cursor.com/luigi/shiplog-demo.git
+```
+Then:
+1. Install Shiplog on `luigi` (selected repos → shiplog-demo).
+2. Open and merge a `feat:` PR, and check the Shiplog comment.
+3. Push tag `v1.1.0`; release notes are recorded on the dashboard. There is no PR to comment on for a tag.
