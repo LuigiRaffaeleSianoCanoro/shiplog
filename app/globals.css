@@ -9,7 +9,7 @@ h1 { font-size: clamp(2.8rem, 7vw, 5.4rem); line-height: .95; }
 h3 { font-size: 1.5rem; }
 .accent { color: var(--red); }
 .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; position: relative; }
-header.top { display:flex; align-items:center; justify-content:space-between; padding: 18px 32px; background: rgba(251,248,241,.88); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; gap: 12px; flex-wrap: wrap; }
+header.top { display:flex; align-items:center; justify-content:space-between; padding: 18px 32px; background: var(--bg); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; gap: 12px; flex-wrap: wrap; }
 .brand { display:flex; gap:8px; align-items:center; font-family: var(--font-display); font-weight:900; font-size:1.5rem; letter-spacing:.02em; text-decoration:none; color: var(--navy); }
 .brand img { width:28px; height:28px; }
 nav { display:flex; align-items:center; gap: 18px; flex-wrap: wrap; }
@@ -48,10 +48,14 @@ table { width:100%; border-collapse: collapse; font-size: .9rem; } td, th { text
 @keyframes shadow { 0%,100% { transform: scaleX(1); opacity: 1; } 50% { transform: scaleX(.9); opacity: .7; } }
 .waterline { background: var(--navy) url(/brand/texture-subway-tile-navy.png) repeat; background-size: 256px; border-top: 6px solid var(--red); color: #fff; padding: 48px 0 24px; margin-top: 24px; }
 .waterline h3 { color: #fff; }
-.waterline .panel { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); box-shadow: none; color: #fff; }
+.waterline .panel { background: #1B2D6B; border-color: #2C3F80; box-shadow: none; color: #fff; }
 .waterline .muted, .waterline footer { color: #B9C2E0; }
 .step { font-family: var(--font-display); font-weight:900; color: var(--red); font-size: 2.2rem; line-height: 1; }
-.page { padding-top: 40px; padding-bottom: 64px; }
+.page { margin-top: 32px; margin-bottom: 48px; padding-top: 32px; padding-bottom: 32px; background: var(--bg); border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 2px 0 var(--line), 0 18px 40px -24px rgba(19,35,90,.45); }
+.page .panel { box-shadow: 0 1px 0 var(--line); }
+.hero-card { background: var(--bg); border: 1px solid var(--line); border-top: 5px solid var(--red); border-radius: 20px; padding: 32px; box-shadow: 0 2px 0 var(--line), 0 18px 40px -24px rgba(19,35,90,.45); }
+.foot-card { display:inline-block; background: #1B2D6B; border: 1px solid #2C3F80; border-radius: 999px; padding: 8px 16px; }
+@media (max-width: 820px) { .hero-card { padding: 22px; } .page { margin-left: 12px; margin-right: 12px; padding-left: 18px; padding-right: 18px; } }
 .fade-up { animation: fadeUp .6s cubic-bezier(.2,.7,.2,1) both; }
 .fade-up.d1 { animation-delay: .08s } .fade-up.d2 { animation-delay: .16s } .fade-up.d3 { animation-delay: .24s }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }

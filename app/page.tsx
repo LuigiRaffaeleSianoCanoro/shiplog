@@ -5,7 +5,7 @@ export default function Home() {
     <>
       <main className="wrap">
         <section className="hero">
-          <div>
+          <div className="hero-card">
             <span className="pill outline fade-up">Origin App · beta</span>
             <h1 className="fade-up d1" style={{ marginTop: 18 }}>Your merges,<br /><span className="accent">written up.</span></h1>
             <p className="lede fade-up d2">
@@ -36,7 +36,7 @@ export default function Home() {
             <div className="panel"><div className="step">02</div><h3>Draft</h3><p className="muted">A Cursor cloud agent on your key edits only CHANGELOG.md and opens a PR. No key? You get a copy-ready prompt.</p></div>
             <div className="panel"><div className="step">03</div><h3>Release</h3><p className="muted">Comment <code>/shiplog release v1.2.0</code> and Unreleased becomes a dated section with a summary.</p></div>
           </div>
-          <footer>Shiplog is an independent Origin App. Not affiliated with Cursor.</footer>
+          <footer><span className="foot-card">Shiplog is an independent Origin App. Not affiliated with Cursor.</span></footer>
         </div>
       </section>
     </>

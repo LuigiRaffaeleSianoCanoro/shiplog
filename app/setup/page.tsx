@@ -13,7 +13,7 @@ export default async function Setup({ searchParams }: { searchParams: Promise<{ 
   const session = readSession((await cookies()).get(COOKIE)?.value);
   const key = inst ? await store.getKey(inst.id) : null;
   return (
-    <main className="wrap" style={{ maxWidth: 620, paddingTop: 40, paddingBottom: 64 }}>
+    <main className="wrap page" style={{ maxWidth: 620 }}>
       <h1 className="fade-up">Connect <span className="accent">your Cursor key</span></h1>
       {!installation_id && <p className="muted">Open this page from the Shiplog install link on Origin — it carries your <code>installation_id</code>.</p>}
       {installation_id && !inst && <p className="muted">We haven&apos;t received the install event for <code>{installation_id}</code> yet. Refresh in a few seconds.</p>}
