@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 export interface Sealed { ciphertext: string; iv: string; tag: string; keyVersion: number }
 
@@ -26,3 +26,9 @@ export function open(s: Sealed, master: Buffer, aad: string): string {
 }
 
 export const last4 = (k: string) => k.slice(-4);
+
+/** Constant-time string comparison. */
+export function safeEqual(a: string, b: string) {
+  const h = (v: string) => createHash("sha256").update(v).digest();
+  return timingSafeEqual(h(a), h(b));
+}

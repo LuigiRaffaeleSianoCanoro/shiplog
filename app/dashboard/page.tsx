@@ -1,18 +1,23 @@
 import { getStore } from "@/lib/store";
 import { env } from "@/lib/env";
 import { pollAgents } from "@/lib/jobs";
+import { cookies } from "next/headers";
+import { COOKIE, readSession } from "@/lib/session";
+import { safeEqual } from "@/lib/crypto";
 
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ installation_id?: string; token?: string }> }) {
   const { installation_id, token } = await searchParams;
   const store = getStore();
-  await pollAgents().catch(() => 0); // Hobby cron is daily; also poll on view.
-  // Without an installation id, the overview needs the operator token (if configured).
+  // Scoped view needs the install session for that installation; the overview needs the operator token.
   const scoped = installation_id ?? null;
-  if (!scoped && env.dashboardToken && token !== env.dashboardToken) {
-    return <main className="wrap page"><h1>Dash<span className="accent">board</span></h1><p className="muted">Open from your setup page link.</p></main>;
+  const operator = !!env.dashboardToken && !!token && safeEqual(token, env.dashboardToken);
+  const session = readSession((await cookies()).get(COOKIE)?.value);
+  if (!operator && !(scoped && session === scoped)) {
+    return <main className="wrap page"><h1>Dash<span className="accent">board</span></h1><p className="muted">Open from your setup page link (sessions last 1 hour; reinstall or re-consent to get a new one).</p></main>;
   }
+  await pollAgents().catch(() => 0); // Hobby cron is daily; also poll on view (after auth).
   const installs = scoped ? [await store.getInstallation(scoped)].filter(Boolean) as Awaited<ReturnType<typeof store.listInstallations>> : await store.listInstallations();
   const jobs = (await store.listJobs(scoped ?? undefined)).slice(0, 20);
   const outbox = (await store.listOutbox(scoped ?? undefined)).slice(0, 5);

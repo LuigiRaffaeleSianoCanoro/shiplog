@@ -19,5 +19,8 @@ export const env = {
   supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   /** Skip signature verification ONLY for local tests. Refused in production. */
   insecureWebhooks: process.env.SHIPLOG_INSECURE_WEBHOOKS === "true" && process.env.NODE_ENV !== "production",
+  /** Canonical origin whose /api/install/callback is registered in the Origin app's installationRedirectUris.
+   *  Installs started on any other host (custom domain, preview) are bounced here first. */
+  installOrigin: unset(process.env.SHIPLOG_INSTALL_ORIGIN).replace(/\/+$/, ""),
   dashboardToken: process.env.SHIPLOG_DASHBOARD_TOKEN ?? "",
 };
