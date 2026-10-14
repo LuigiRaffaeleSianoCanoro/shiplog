@@ -49,6 +49,7 @@ Production: https://shiplog-luigi-canoros-projects.vercel.app. Vercel Authentica
 | `SHIPLOG_KEY_ENC`, `CRON_SECRET`, `SHIPLOG_DASHBOARD_TOKEN` | generated, sensitive |
 | `SHIPLOG_LLM_PROVIDER=neon`, `SHIPLOG_NEON_MODEL`, `NEON_AI_GATEWAY_*` | test mode |
 | `SHIPLOG_BYOK_ENABLED=true` | set |
+| `SHIPLOG_INSTALL_ORIGIN` | `https://shiplog-luigi-canoros-projects.vercel.app`. Must be the host of an entry in the Origin app's `installationRedirectUris` (exact match). `/api/install/start` on any other host (e.g. shiplog.help) redirects here first. |
 | `BLOB_READ_WRITE_TOKEN` | from the connected Blob store |
 | `ORIGIN_APP_ID` (`app_01m4vhdccyfywsqbd9v26h126w`), `ORIGIN_APP_PRIVATE_KEY` | set, sensitive. App JWT verified live (`GET /v1/origin/app` returned 200), and a signed Origin ping was accepted (202). |
 
