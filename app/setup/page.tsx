@@ -1,6 +1,7 @@
 import { getStore } from "@/lib/store";
 import { env } from "@/lib/env";
 import SetupForm from "./SetupForm";
+import { getInstallationInfo, originConfigured } from "@/lib/origin";
 import { cookies } from "next/headers";
 import { COOKIE, readSession } from "@/lib/session";
 
@@ -9,7 +10,14 @@ export const dynamic = "force-dynamic";
 export default async function Setup({ searchParams }: { searchParams: Promise<{ installation_id?: string }> }) {
   const { installation_id } = await searchParams;
   const store = getStore();
-  const inst = installation_id ? await store.getInstallation(installation_id) : null;
+  let inst = installation_id ? await store.getInstallation(installation_id) : null;
+  // Older records saved before the callback resolved the namespace: backfill it once.
+  if (inst && !inst.namespace && originConfigured()) {
+    try {
+      const info = await getInstallationInfo(inst.id);
+      if (info.namespace) { inst = { ...inst, namespace: info.namespace, namespaceType: inst.namespaceType ?? info.namespaceType, installerId: inst.installerId ?? info.installerId }; await store.upsertInstallation(inst); }
+    } catch (e) { console.error("[shiplog] installation lookup failed:", (e as Error).message); }
+  }
   const session = readSession((await cookies()).get(COOKIE)?.value);
   const key = inst ? await store.getKey(inst.id) : null;
   return (

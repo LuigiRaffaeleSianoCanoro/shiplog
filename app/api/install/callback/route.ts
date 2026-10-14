@@ -3,6 +3,7 @@ import { env } from "@/lib/env";
 import { verifyReceipt } from "@/lib/receipt";
 import { getStore } from "@/lib/store";
 import { COOKIE, signSession } from "@/lib/session";
+import { getInstallationInfo, originConfigured } from "@/lib/origin";
 
 export const runtime = "nodejs";
 
@@ -20,7 +21,17 @@ export async function GET(req: Request) {
     if ((expected || r.state) && r.state !== expected) throw new Error("state mismatch (start the install again from Shiplog)");
     const store = getStore();
     const existing = await store.getInstallation(r.sub);
-    await store.upsertInstallation({ ...existing, id: r.sub, namespace: existing?.namespace ?? "", status: "active", createdAt: existing?.createdAt ?? new Date().toISOString(), disconnectedAt: null, installerId: existing?.installerId ?? r.installedBy?.id ?? null });
+    // Fresh installs: the receipt has no namespace slug, so resolve it now (else /setup shows the raw id).
+    let namespace = existing?.namespace || "";
+    let namespaceType = existing?.namespaceType ?? null;
+    let installerId = existing?.installerId ?? r.installedBy?.id ?? null;
+    if ((!namespace || !namespaceType) && originConfigured()) {
+      try {
+        const info = await getInstallationInfo(r.sub);
+        namespace = namespace || info.namespace; namespaceType = namespaceType ?? info.namespaceType; installerId = installerId ?? info.installerId;
+      } catch (e) { console.error("[shiplog] installation lookup failed:", (e as Error).message); }
+    }
+    await store.upsertInstallation({ ...existing, id: r.sub, namespace, namespaceType, status: "active", createdAt: existing?.createdAt ?? new Date().toISOString(), disconnectedAt: null, installerId });
     const res = NextResponse.redirect(new URL(`/setup?installation_id=${encodeURIComponent(r.sub)}`, url.origin));
     res.cookies.set(COOKIE, signSession(r.sub), { httpOnly: true, secure: url.protocol === "https:", sameSite: "lax", path: "/", maxAge: 3600 });
     res.cookies.set("shiplog_state", "", { path: "/api/install", maxAge: 0 });
