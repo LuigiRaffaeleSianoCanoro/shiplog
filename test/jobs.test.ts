@@ -32,11 +32,17 @@ describe("job flows", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: replies.shift() } }] }))));
     await jobs.handleEvent(merged("8", "feat: dark mode"), "d2");
     expect(await store.getChangelog("luigi/demo")).toContain("- Dark mode toggle (#8)");
-    const rel = await jobs.handleEvent({ installationId: "i_1", event: { type: "pull_request.comment.created", payload: { pullRequest: { number: "8" }, comment: { body: "/shiplog release v1.0.0" }, repository: { name: "demo", owner: { slug: "luigi" } } } } }, "d3");
+    const rel = await jobs.handleEvent({ installationId: "i_1", event: { type: "pull_request.comment.created", payload: { pullRequest: { number: "8", repository: { name: "demo", owner: { slug: "luigi" } } }, comment: { body: "/shiplog release v1.0.0" } } } }, "d3"); // real Origin shape: repo only under pullRequest
     expect(rel?.kind).toBe("release"); expect(rel?.status).toBe("done");
     const md = await store.getChangelog("luigi/demo");
     expect(md).toMatch(/## \[1\.0\.0\] - \d{4}-\d{2}-\d{2}\n\nThis release adds dark mode\./);
     vi.unstubAllGlobals();
+  });
+
+  it("ignores Shiplog's own comments", async () => {
+    const { jobs } = await setup({});
+    const r = await jobs.handleEvent({ installationId: "i_1", event: { type: "pull_request.comment.created", payload: { pullRequest: { number: "8", repository: { name: "demo", owner: { slug: "luigi" } } }, comment: { body: "**Shiplog** notes\n/shiplog release v1.0.0" } } } }, "d9");
+    expect(r).toBeNull();
   });
 
   it("with a stored key → launches a Cursor agent", async () => {

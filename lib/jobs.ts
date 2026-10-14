@@ -38,7 +38,11 @@ export async function pickMode(installationId: string): Promise<{ mode: JobMode;
   return key ? { mode: "cursor", key } : { mode: "fallback" };
 }
 
-const repoOf = (p: any): string => p?.repository?.owner?.slug && p?.repository?.name ? `${p.repository.owner.slug}/${p.repository.name}` : (p?.repository?.fullName ?? "unknown/unknown");
+// pull_request.comment.created carries the repo only under pullRequest.repository.
+const repoOf = (p: any): string => {
+  const r = p?.repository ?? p?.pullRequest?.repository;
+  return r?.owner?.slug && r?.name ? `${r.owner.slug}/${r.name}` : (r?.fullName ?? "unknown/unknown");
+};
 const repoUrl = (repo: string) => `https://cursor.com/codebase/${repo}`;
 
 export async function handleEvent(env_: Envelope, deliveryId: string): Promise<Job | null> {
@@ -79,10 +83,13 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
     if (version) kind = "release";
   }
   if (type === "pull_request.comment.created") {
-    version = parseReleaseCommand(payload?.comment?.body ?? "");
+    const text: string = payload?.comment?.body ?? "";
+    // Never react to Shiplog's own comments (avoids reply loops).
+    version = text.trimStart().startsWith("**Shiplog**") ? null : parseReleaseCommand(text);
     if (version) kind = "release";
   }
   if (!kind) return null;
+  if (repo === "unknown/unknown") { console.error(`[shiplog] ${type}: no repository in payload`); return null; }
 
   const prNumber = String(pr?.number ?? payload?.pullRequest?.number ?? "");
   const info: PrInfo = { repo, number: prNumber, title: pr?.title ?? "", body: pr?.body ?? "", url: pr?.webUrl ?? (prNumber ? `${repoUrl(repo)}/pull/${prNumber}` : repoUrl(repo)) };
