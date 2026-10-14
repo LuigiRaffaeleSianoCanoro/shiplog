@@ -31,7 +31,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           {await Promise.all(installs.map(async (i) => { const k = await store.getKey(i.id); return (
             <tr key={i.id}><td><code>{i.id}</code></td><td>{i.namespace}</td>
               <td><span className={i.status === "active" ? "pill" : "pill off"}>{i.status === "active" ? "Connected" : i.status === "disconnected" ? "Disconnected" : "Suspended"}</span></td>
-              <td>{k ? `•••• ${k.last4}` : <span className="muted">none (prompt mode)</span>}</td></tr>); }))}
+              <td>{k ? `•••• ${k.last4}${k.kind === "service_account" ? " · service account" : ""}` : <span className="muted">none (prompt mode)</span>} {scoped && session === i.id && <a href={`/setup?installation_id=${encodeURIComponent(i.id)}`}>{k ? "Rotate" : "Add key"}</a>}</td></tr>); }))}
           {!installs.length && <tr><td colSpan={4} className="muted">No installations yet.</td></tr>}
         </tbody></table></div>
       </div>

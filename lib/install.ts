@@ -6,6 +6,8 @@ export const INSTALL_SCOPES = [
   "repository:pull_requests:read",
   "repository:pull_requests:reviews:read",
   "repository:pull_requests:reviews:write",
+  // Lets Shiplog check that a `/shiplog release` commenter has write/admin on the repo.
+  "repository:members:read",
 ];
 
 /** Origin install URL (client_id = Origin App ID). */

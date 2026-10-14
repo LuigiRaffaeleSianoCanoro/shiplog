@@ -39,7 +39,8 @@ export class BlobStore implements Store {
   async listInstallations() { return (await readAll<Installation>(`${P}/installations/`)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
   async putKey(k: UserKey) { await write(`${P}/keys/${enc(k.installationId)}.json`, k); }
   getKey(id: string) { return readJson<UserKey>(`${P}/keys/${enc(id)}.json`); }
-  async deleteKey(id: string) { await del(`${P}/keys/${enc(id)}.json`).catch(() => undefined); }
+  // del() is a no-op for missing blobs; real failures must surface.
+  async deleteKey(id: string) { await del(`${P}/keys/${enc(id)}.json`); }
   async putJob(j: Job) {
     // Index by installation for scoped listing; job id stays stable so updates overwrite.
     await write(`${P}/jobs/${enc(j.installationId)}/${rev(j.createdAt)}-${j.id}.json`, j);

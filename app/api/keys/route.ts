@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   if (!env.byokEnabled) return NextResponse.json({ error: "Key connection is disabled; Shiplog runs in prompt-only mode." }, { status: 403 });
-  const { installationId, key } = (await req.json().catch(() => ({}))) as { installationId?: string; key?: string };
+  const { installationId, key, kind } = (await req.json().catch(() => ({}))) as { installationId?: string; key?: string; kind?: string };
   if (!installationId || !key) return NextResponse.json({ error: "installationId and key are required" }, { status: 400 });
   if (!(await authorized(installationId))) return NextResponse.json({ error: "Open this page from the Shiplog install link (session expired)." }, { status: 401 });
   const store = getStore();
@@ -20,9 +20,14 @@ export async function POST(req: Request) {
   if (!inst || inst.status !== "active") return NextResponse.json({ error: "Unknown or disconnected installation" }, { status: 404 });
   const trimmed = key.trim();
   if (!(await validateCursorKey(trimmed).catch(() => false))) return NextResponse.json({ error: "Cursor rejected this key" }, { status: 422 });
+  // Rotation: the new key is validated above BEFORE the old one is touched; then it replaces the old record
+  // (same path, overwrite) so the old ciphertext no longer exists anywhere.
+  const previous = await store.getKey(installationId);
+  const now = new Date().toISOString();
   const sealed = seal(trimmed, parseMasterKey(env.encKey), installationId);
-  await store.putKey({ ...sealed, installationId, last4: last4(trimmed), createdAt: new Date().toISOString() });
-  return NextResponse.json({ ok: true, last4: last4(trimmed) });
+  const keyKind = kind === "service_account" ? "service_account" : "personal";
+  await store.putKey({ ...sealed, installationId, last4: last4(trimmed), kind: keyKind, createdAt: now, rotatedAt: previous ? now : null });
+  return NextResponse.json({ ok: true, last4: last4(trimmed), kind: keyKind, rotated: !!previous });
 }
 
 export async function DELETE(req: Request) {

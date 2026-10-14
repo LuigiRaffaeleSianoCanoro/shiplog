@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     if ((expected || r.state) && r.state !== expected) throw new Error("state mismatch (start the install again from Shiplog)");
     const store = getStore();
     const existing = await store.getInstallation(r.sub);
-    await store.upsertInstallation({ id: r.sub, namespace: existing?.namespace ?? "", status: "active", createdAt: existing?.createdAt ?? new Date().toISOString(), disconnectedAt: null });
+    await store.upsertInstallation({ ...existing, id: r.sub, namespace: existing?.namespace ?? "", status: "active", createdAt: existing?.createdAt ?? new Date().toISOString(), disconnectedAt: null, installerId: existing?.installerId ?? r.installedBy?.id ?? null });
     const res = NextResponse.redirect(new URL(`/setup?installation_id=${encodeURIComponent(r.sub)}`, url.origin));
     res.cookies.set(COOKIE, signSession(r.sub), { httpOnly: true, secure: url.protocol === "https:", sameSite: "lax", path: "/", maxAge: 3600 });
     res.cookies.set("shiplog_state", "", { path: "/api/install", maxAge: 0 });

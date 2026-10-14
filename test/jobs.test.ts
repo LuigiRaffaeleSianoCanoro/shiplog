@@ -32,7 +32,8 @@ describe("job flows", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: replies.shift() } }] }))));
     await jobs.handleEvent(merged("8", "feat: dark mode"), "d2");
     expect(await store.getChangelog("luigi/demo")).toContain("- Dark mode toggle (#8)");
-    const rel = await jobs.handleEvent({ installationId: "i_1", event: { type: "pull_request.comment.created", payload: { pullRequest: { number: "8", repository: { name: "demo", owner: { slug: "luigi" } } }, comment: { body: "/shiplog release v1.0.0" } } } }, "d3"); // real Origin shape: repo only under pullRequest
+    await store.upsertInstallation({ ...(await store.getInstallation("i_1"))!, installerId: "user_owner" });
+    const rel = await jobs.handleEvent({ installationId: "i_1", event: { type: "pull_request.comment.created", payload: { pullRequest: { number: "8", repository: { name: "demo", owner: { slug: "luigi" } } }, comment: { body: "/shiplog release v1.0.0", author: { user: { id: "user_owner" } } } } } }, "d3"); // real Origin shape: repo only under pullRequest
     expect(rel?.kind).toBe("release"); expect(rel?.status).toBe("done");
     const md = await store.getChangelog("luigi/demo");
     expect(md).toMatch(/## \[1\.0\.0\] - \d{4}-\d{2}-\d{2}\n\nThis release adds dark mode\./);

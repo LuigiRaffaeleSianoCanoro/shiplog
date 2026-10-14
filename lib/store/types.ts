@@ -1,8 +1,9 @@
 import type { Sealed } from "../crypto";
 
 export type InstallStatus = "active" | "suspended" | "disconnected";
-export interface Installation { id: string; namespace: string; status: InstallStatus; createdAt: string; disconnectedAt?: string | null }
-export interface UserKey extends Sealed { installationId: string; last4: string; createdAt: string }
+export interface Installation { id: string; namespace: string; status: InstallStatus; createdAt: string; disconnectedAt?: string | null; installerId?: string | null; namespaceType?: "user" | "team" | null }
+export type KeyKind = "personal" | "service_account";
+export interface UserKey extends Sealed { installationId: string; last4: string; createdAt: string; kind?: KeyKind; rotatedAt?: string | null }
 export type JobKind = "changelog" | "release";
 export type JobMode = "cursor" | "neon" | "fallback";
 export interface Job {

@@ -5,11 +5,35 @@ import { addEntry, changelogPrompt, classify, cutRelease, parseReleaseCommand, r
 import { draftEntry, draftSummary } from "./llm";
 import { getRun, launchAgent } from "./cursor";
 import { open, parseMasterKey } from "./crypto";
-import { commentOnPr, originConfigured } from "./origin";
+import { commentOnPr, getInstallationInfo, originConfigured, repoPermission } from "./origin";
 
 export interface Envelope {
   deliveryId?: string; installationId: string;
   event: { id?: string; type: string; payload: any };
+}
+
+/**
+ * Only the installer, or a user with write/admin on the repo, may run `/shiplog release` (it can launch an agent
+ * billed to the key owner). Apps and service accounts commenting on their own are refused.
+ */
+export async function canRelease(installationId: string, repo: string, author: any): Promise<boolean> {
+  const userId: string | undefined = author?.user?.id;
+  if (!userId || author?.app || author?.serviceAccount || author?.user?.performedVia?.app) return false;
+  const store = getStore();
+  const inst = await store.getInstallation(installationId);
+  let installerId = inst?.installerId ?? null;
+  if (installerId && installerId === userId) return true;
+  if (!originConfigured()) return false;
+  if (!installerId) {
+    try {
+      const info = await getInstallationInfo(installationId);
+      installerId = info.installerId;
+      if (inst) await store.upsertInstallation({ ...inst, installerId, namespace: inst.namespace || info.namespace, namespaceType: info.namespaceType });
+    } catch (e) { console.error("[shiplog] installation lookup failed:", (e as Error).message); }
+  }
+  if (installerId && installerId === userId) return true;
+  const perm = await repoPermission(installationId, repo, userId).catch(() => null);
+  return perm === "write" || perm === "admin";
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -86,6 +110,11 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
     const text: string = payload?.comment?.body ?? "";
     // Never react to Shiplog's own comments (avoids reply loops).
     version = text.trimStart().startsWith("**Shiplog**") ? null : parseReleaseCommand(text);
+    if (version && !(await canRelease(instId, repo, payload?.comment?.author))) {
+      const n = String(payload?.pullRequest?.number ?? "");
+      await postComment(instId, repo, n, `**Shiplog**: \`/shiplog release\` can only be run by the person who installed Shiplog or by someone with write or admin access to this repository.`);
+      return null;
+    }
     if (version) kind = "release";
   }
   if (!kind) return null;
