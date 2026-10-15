@@ -38,3 +38,17 @@ describe("changelog", () => {
     expect(p).toContain("Only edit CHANGELOG.md");
   });
 });
+
+describe("PR commands", () => {
+  it("parses /shiplog skip and /shiplog entry", async () => {
+    const { parsePrCommand } = await import("@/lib/changelog");
+    expect(parsePrCommand("/shiplog skip")).toEqual({ kind: "skip" });
+    expect(parsePrCommand("lgtm\n/shiplog skip please")).toEqual({ kind: "skip" });
+    expect(parsePrCommand('/shiplog entry "Faster cold starts on Linux"')).toEqual({ kind: "entry", text: "Faster cold starts on Linux" });
+    expect(parsePrCommand("/shiplog entry “Curly quotes work”")).toEqual({ kind: "entry", text: "Curly quotes work" });
+    expect(parsePrCommand('/shiplog entry ""')).toBeNull();
+    expect(parsePrCommand("/shiplog entry no quotes")).toBeNull();
+    expect(parsePrCommand("/shiplog release v1.0.0")).toBeNull();
+    expect(parsePrCommand("/shiplogskip")).toBeNull();
+  });
+});

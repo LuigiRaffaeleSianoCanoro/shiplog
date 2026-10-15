@@ -50,14 +50,15 @@ export function sectionFor(title: string, c: ShiplogConfig): Section | null {
 const labelNames = (pr: any): string[] => (pr?.labels ?? []).map((l: any) => (typeof l === "string" ? l : l?.name)).filter(Boolean);
 const glob = (pat: string, s: string) => new RegExp(`^${pat.toLowerCase().replace(/[.+?^${}()[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`).test(s.toLowerCase());
 
-/** Why this PR is excluded from the changelog, or null. "bots" in authors matches any app or service account. */
+/** Why this PR is excluded from the changelog, or null. The no-changelog label always excludes. "bots" in authors matches any app or service account. */
+export const ALWAYS_SKIP_LABEL = "no-changelog";
 export function excludedBy(pr: any, c: ShiplogConfig): string | null {
-  const wanted = c.exclude.labels.map((l) => l.toLowerCase());
+  const wanted = [...c.exclude.labels, ALWAYS_SKIP_LABEL].map((l) => l.toLowerCase());
   const label = labelNames(pr).find((l) => wanted.includes(l.toLowerCase()));
   if (label) return `label ${label.toLowerCase()}`;
   const a = pr?.author ?? {};
   const isBot = Boolean(a.app || a.serviceAccount || a.user?.performedVia?.app);
-  const name: string = a.user?.slug ?? a.user?.username ?? a.app?.slug ?? a.serviceAccount?.slug ?? a.login ?? "";
+  const name: string = a.user?.handle ?? a.user?.slug ?? a.user?.username ?? a.app?.slug ?? a.app?.displayName ?? a.serviceAccount?.displayName ?? a.login ?? "";
   if (!name && !isBot) return null;
   if (c.exclude.authors.some((p) => (p.toLowerCase() === "bots" && isBot) || (name && glob(p, name)))) return `author ${name || "bot"}`;
   return null;

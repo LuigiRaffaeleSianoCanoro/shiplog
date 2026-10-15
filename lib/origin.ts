@@ -57,3 +57,22 @@ export async function getRepoFile(installationId: string, repo: string, path: st
   const j = (await r.json()) as { type?: string; content?: string };
   return j.type === "file" && j.content ? Buffer.from(j.content, "base64").toString("utf8") : null;
 }
+
+export interface PrComment { body: string; author: any }
+/** Every comment on a PR, oldest first (needs repository:pull_requests:reviews:read). Capped at 500. */
+export async function listPrComments(installationId: string, repo: string, prNumber: string): Promise<PrComment[]> {
+  const [owner, name] = repo.split("/");
+  const token = await installationToken(installationId);
+  const out: PrComment[] = [];
+  let page = "";
+  for (let i = 0; i < 5; i++) {
+    const q = `pageSize=100${page ? `&pageToken=${encodeURIComponent(page)}` : ""}`;
+    const r = await fetch(`${env.originApi}/repos/${owner}/${name}/pulls/${prNumber}/comments?${q}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+    if (!r.ok) throw new Error(`comments ${r.status}`);
+    const j = (await r.json()) as { comments?: PrComment[]; nextPageToken?: string };
+    out.push(...(j.comments ?? []));
+    if (!j.nextPageToken) break;
+    page = j.nextPageToken;
+  }
+  return out;
+}

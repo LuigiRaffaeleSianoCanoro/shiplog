@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { env } from "./env";
 import { getStore, type Job, type JobMode } from "./store";
-import { addEntry, changelogPrompt, cutRelease, parseReleaseCommand, releasePrompt, tagsFromPush, unreleased, type PrInfo } from "./changelog";
+import { addEntry, changelogPrompt, cutRelease, parsePrCommand, parseReleaseCommand, type PrCommand, releasePrompt, tagsFromPush, unreleased, type PrInfo } from "./changelog";
 import { draftEntry, draftSummary } from "./llm";
 import { getRun, launchAgent } from "./cursor";
 import { open, parseMasterKey } from "./crypto";
-import { commentOnPr, getInstallationInfo, getRepoFile, originConfigured, repoPermission } from "./origin";
+import { commentOnPr, getInstallationInfo, getRepoFile, listPrComments, originConfigured, repoPermission } from "./origin";
 import { CONFIG_PATH, DEFAULT_CONFIG, excludedBy, parseConfig, sectionFor, type ShiplogConfig } from "./config";
 
 export interface Envelope {
@@ -14,7 +14,7 @@ export interface Envelope {
 }
 
 /**
- * Only the installer, or a user with write/admin on the repo, may run `/shiplog release` (it can launch an agent
+ * Only the installer, or a user with write/admin on the repo, may run `/shiplog` commands. `release` (it can launch an agent
  * billed to the key owner). Apps and service accounts commenting on their own are refused.
  */
 export async function canRelease(installationId: string, repo: string, author: any): Promise<boolean> {
@@ -70,6 +70,19 @@ async function loadConfig(installationId: string, repo: string): Promise<Shiplog
   catch (e) { console.error("[shiplog] config load failed:", (e as Error).message); return DEFAULT_CONFIG; }
 }
 
+const isOwnComment = (text: string) => text.trimStart().startsWith("**Shiplog**");
+
+/** The latest `/shiplog skip` or `/shiplog entry` on the PR from someone allowed to run it. */
+async function latestPrCommand(installationId: string, repo: string, prNumber: string): Promise<PrCommand | null> {
+  if (!originConfigured() || !prNumber) return null;
+  const comments = await listPrComments(installationId, repo, prNumber).catch((e) => { console.error("[shiplog] comments failed:", (e as Error).message); return []; });
+  for (const c of comments.reverse()) {
+    const cmd = isOwnComment(c.body ?? "") ? null : parsePrCommand(c.body ?? "");
+    if (cmd && (await canRelease(installationId, repo, c.author))) return cmd;
+  }
+  return null;
+}
+
 // pull_request.comment.created carries the repo only under pullRequest.repository.
 const repoOf = (p: any): string => {
   const r = p?.repository ?? p?.pullRequest?.repository;
@@ -117,10 +130,19 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
   if (type === "pull_request.comment.created") {
     const text: string = payload?.comment?.body ?? "";
     // Never react to Shiplog's own comments (avoids reply loops).
-    version = text.trimStart().startsWith("**Shiplog**") ? null : parseReleaseCommand(text);
-    if (version && !(await canRelease(instId, repo, payload?.comment?.author))) {
-      const n = String(payload?.pullRequest?.number ?? "");
-      await postComment(instId, repo, n, `**Shiplog**: \`/shiplog release\` can only be run by the person who installed Shiplog or by someone with write or admin access to this repository.`);
+    if (isOwnComment(text)) return null;
+    version = parseReleaseCommand(text);
+    const cmd = version ? null : parsePrCommand(text);
+    const n = String(payload?.pullRequest?.number ?? "");
+    if ((version || cmd) && !(await canRelease(instId, repo, payload?.comment?.author))) {
+      await postComment(instId, repo, n, `**Shiplog**: \`/shiplog ${version ? "release" : cmd!.kind}\` can only be run by the person who installed Shiplog or by someone with write or admin access to this repository.`);
+      return null;
+    }
+    if (cmd) {
+      // Applied at merge time, read back from the PR's comments, so nothing is stored here.
+      await postComment(instId, repo, n, cmd.kind === "skip"
+        ? `**Shiplog** will skip the changelog for this PR when it merges.`
+        : `**Shiplog** will use this changelog entry when the PR merges: "${cmd.text}"`);
       return null;
     }
     if (version) kind = "release";
@@ -134,7 +156,9 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
   const picked = await pickMode(instId);
   const { mode, key } = cfg.mode === "prompt" && picked.mode === "cursor" ? { mode: "fallback" as const, key: undefined } : picked;
   const job: Job = { id: randomUUID(), deliveryId, installationId: instId, repo, prNumber, prUrl: info.url, kind, mode, status: "running", createdAt: now };
-  const skip = kind === "changelog" ? excludedBy(pr, cfg) : null;
+  const cmd = kind === "changelog" ? await latestPrCommand(instId, repo, prNumber) : null;
+  const skip = kind !== "changelog" ? null : cmd?.kind === "skip" ? "/shiplog skip" : excludedBy(pr, cfg);
+  const entry = cmd?.kind === "entry" ? cmd.text : undefined;
   if (skip) { job.status = "ignored"; job.result = `excluded by ${skip}`; await store.putJob(job); return job; }
   await store.putJob(job);
 
@@ -142,17 +166,17 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
     if (kind === "changelog") {
       const hint = sectionFor(info.title, cfg);
       if (mode === "neon") {
-        const { section, bullet } = await draftEntry(info, hint, undefined, cfg);
+        const { section, bullet } = entry ? { section: hint ?? "Changed", bullet: `${entry} (#${prNumber})` } : await draftEntry(info, hint, undefined, cfg);
         const md = addEntry(await store.getChangelog(repo), section, bullet);
         await store.putChangelog(repo, md);
         job.result = `### ${section}\n- ${bullet}`;
         await postComment(instId, repo, prNumber, `**Shiplog** drafted a changelog entry for this PR:\n\n\`\`\`md\n## [Unreleased]\n\n${job.result}\n\`\`\`\n\n<sub>Test mode (direct model draft). Comment \`/shiplog release vX.Y.Z\` to cut release notes.</sub>`);
       } else if (mode === "cursor") {
-        const l = await launchAgent(key!, changelogPrompt(info, hint, cfg), repoUrl(repo));
+        const l = await launchAgent(key!, changelogPrompt(info, hint, cfg, entry), repoUrl(repo));
         job.agentId = l.agentId; job.runId = l.runId; job.result = `agent ${l.agentId}`;
         await postComment(instId, repo, prNumber, `**Shiplog** is drafting the changelog entry with a Cursor cloud agent on your plan. A PR updating \`${cfg.changelogPath}\` will follow.`);
       } else {
-        job.result = changelogPrompt(info, hint, cfg);
+        job.result = changelogPrompt(info, hint, cfg, entry);
         await postComment(instId, repo, prNumber, fallbackComment(info, job.result));
       }
     } else {
