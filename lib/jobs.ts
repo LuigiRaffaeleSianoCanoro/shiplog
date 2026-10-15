@@ -246,15 +246,18 @@ export async function flushBatches(): Promise<number> {
   }
   let launched = 0;
   for (const queued of groups.values()) {
-    const { installationId, repo } = queued[0];
+    const ids = new Set(queued.map((j) => j.id));
+    const live = (await store.listJobs()).filter((j) => ids.has(j.id) && j.status === "queued" && batchOf(j) === "daily");
+    if (!live.length) continue;
+    const { installationId, repo } = live[0];
     try {
       const key = await userKey(installationId);
       if (!key) continue;
       const cfg = await loadConfig(installationId, repo);
-      const l = await launchAgent(key, batchPrompt(repo, queued.map(entryOf), cfg), repoUrl(repo));
-      const job: Job = { id: randomUUID(), deliveryId: `batch-${randomUUID()}`, installationId, repo, prNumber: "", prUrl: repoUrl(repo), kind: "changelog", mode: "cursor", status: "running", agentId: l.agentId, runId: l.runId, result: `agent ${l.agentId} (${queued.length} queued PRs)`, createdAt: new Date().toISOString() };
+      const l = await launchAgent(key, batchPrompt(repo, live.map(entryOf), cfg), repoUrl(repo));
+      const job: Job = { id: randomUUID(), deliveryId: `batch-${randomUUID()}`, installationId, repo, prNumber: "", prUrl: repoUrl(repo), kind: "changelog", mode: "cursor", status: "running", agentId: l.agentId, runId: l.runId, result: `agent ${l.agentId} (${live.length} queued PRs)`, createdAt: new Date().toISOString() };
       await store.putJob(job);
-      await markBatched(queued, job.id);
+      await markBatched(live, job.id);
       launched++;
     } catch (e) { console.error("[shiplog] batch flush failed:", (e as Error).message); }
   }
@@ -293,11 +296,13 @@ export async function pollAgents(): Promise<number> {
       if (!key) { job.status = "failed"; job.result = "key removed"; await store.putJob(job); continue; }
       const run = await getRun(key, job.agentId!, job.runId!);
       if (run.prUrl || TERMINAL.has(run.status)) {
+        const announce = Boolean(run.prUrl && !job.prOpened);
         job.prOpened = run.prUrl;
         job.status = run.prUrl ? "done" : "failed";
         job.result = run.prUrl ? `PR ${run.prUrl}` : `agent ${run.status}`;
-        await store.putJob(job); updated++;
-        if (run.prUrl) await postComment(job.installationId, job.repo, job.prNumber, `**Shiplog** opened ${run.prUrl} updating \`CHANGELOG.md\`.`);
+        await store.putJob(job);
+        updated++;
+        if (announce) await postComment(job.installationId, job.repo, job.prNumber, `**Shiplog** opened ${run.prUrl} updating \`CHANGELOG.md\`.`);
       }
     } catch (e) { console.error("[shiplog] poll error:", (e as Error).message); }
   }

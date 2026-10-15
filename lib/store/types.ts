@@ -29,4 +29,7 @@ export interface Store {
   /** Persisted unreleased changelog per repo (used by neon mode and release cuts). */
   getChangelog(repo: string): Promise<string | null>;
   putChangelog(repo: string, md: string): Promise<void>;
+  /** Exclusive lock for `/api/cron/poll` (overlapping schedulers). */
+  acquireCronPollLock(ttlMs: number): Promise<boolean>;
+  releaseCronPollLock(): Promise<void>;
 }

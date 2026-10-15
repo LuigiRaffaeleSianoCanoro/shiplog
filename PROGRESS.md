@@ -1,6 +1,6 @@
 # Progress and decision log
 
-Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR per item against `feat/mvp`.
+Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against `feat/mvp`.
 
 ## Decisions
 
@@ -30,6 +30,11 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR pe
 - 2026-10-15. Item 4. `batch: release` folds every queued PR into the release agent run, so a release costs one run total. `batch: daily` flushes from the existing daily Vercel cron (`/api/cron/poll`), one agent per repo. The dashboard view does not flush, so opening it never spends money.
 - 2026-10-15. Item 4. Batching applies only to Cursor agent mode. Prompt and Neon modes cost the key owner nothing, so they stay per PR.
 - 2026-10-15. Item 4. The dashboard shows agent runs per installation (last 30 days and total) and which key pays (personal or service account). Runs are counted from jobs with an agent id. Exact credit cost is not available from the Cursor API used here.
+
+- 2026-10-15. Item 11. Polling stays on Vercel Cron plus optional external schedulers. No Supabase `pg_cron` or `pg_net` (owner decision). `vercel.json` keeps the daily Hobby schedule; Pro and GitHub Actions are documented for faster intervals.
+- 2026-10-15. Item 11. `/api/cron/poll` uses constant-time `CRON_SECRET` bearer auth and fails closed when the secret is unset. Overlapping callers get `{ skipped: true }` via a store-backed lock (`CRON_POLL_LOCK_TTL_MS`, default 90s).
+- 2026-10-15. Item 11. `flushBatches` re-checks queued jobs before launch; `pollAgents` posts the PR comment only on the first transition to a PR URL.
+- 2026-10-15. Item 11. Implement, test and self-review were done directly on the agent VM. The Neon AI Gateway is not reachable from this environment (same as item 1).
 
 ## Left to do
 
