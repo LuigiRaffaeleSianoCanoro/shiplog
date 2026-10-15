@@ -31,7 +31,33 @@ tone: concise, user-facing
 changelog: CHANGELOG.md
 mode: agent          # or "prompt": never launch an agent, post a ready-to-run prompt instead
 batch: off           # "release": one agent per release; "daily": one agent per repo per day (cron)
+notes:
+  audiences: [technical, customer]   # omit or leave empty to disable
+  languages: [en, es]                # defaults to en and es when audiences are set
+notify:
+  webhooks:          # optional HTTPS URLs (Slack, Discord, or generic JSON POST)
+    - https://hooks.slack.com/services/…
+history:             # initial CHANGELOG backfill on install (merged PRs + semver tags)
+  enabled: true
+  max_prs: 100
+  max_tags: 50
+packages:            # optional monorepo: one changelog per package (roadmap item 13)
+  web:
+    paths: [packages/web/**]
+    changelog: packages/web/CHANGELOG.md
+  api:
+    paths: [packages/api/**]
+    changelog: packages/api/CHANGELOG.md
+orphan: root         # when packages is set: root = unmatched files use `changelog`; ignore = skip them
 ```
+
+When `notes.audiences` is set, Shiplog also drafts **technical** and **customer-facing** release notes in each listed language. In test mode (Neon) they are stored under a repo key like `owner/repo::notes::1.2.0` and posted on the release comment. With a Cursor key, the release agent is asked to write `.shiplog/notes/<version>/<audience>.<lang>.md` files alongside the changelog.
+
+Installation-wide webhooks can also be set on `/setup` (same session as the Cursor key). Shiplog POSTs on changelog entries and releases; failures are logged only.
+
+On first install (and on the first webhook per repo), Shiplog can seed `CHANGELOG.md` from merged pull requests and existing semver tags when the file is still empty. Re-runs are skipped unless you call `POST /api/history/backfill` from an authenticated setup session with `{ "installationId", "repo?", "force": true }`.
+
+When `packages` is set, Shiplog loads the merged PR's changed files from the Origin API (`GET .../pulls/{number}/files`, scope `repository:pull_requests:read`, already requested) and drafts an entry in every matching package changelog. `/shiplog` commands, labels and classification apply to all targeted changelogs for that PR. Release comments include a semver suggestion per changelog file.
 
 ## PR commands
 
@@ -51,10 +77,18 @@ The `no-changelog` label always skips a PR, as does any label in `exclude.labels
 - Prompt injection: PR text is fenced as untrusted, and the agent is told to edit only `CHANGELOG.md`.
 - Supabase: RLS on with no policies, so only the server-side service role can access the data.
 
+## Self-host
+
+Run your own private instance on Vercel Hobby (personal, non-commercial). Full steps, Origin app settings, and every environment variable are in **[docs/self-host.md](docs/self-host.md)**.
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FLuigiRaffaeleSianoCanoro%2Fshiplog%2Ftree%2Ffeat%2Fmvp&project-name=shiplog&repository-name=shiplog&env=ORIGIN_APP_ID&env=ORIGIN_APP_PRIVATE_KEY&env=SHIPLOG_KEY_ENC&env=CRON_SECRET&env=SHIPLOG_INSTALL_ORIGIN&env=SHIPLOG_LLM_PROVIDER&env=SHIPLOG_BYOK_ENABLED&envLink=https%3A%2F%2Fgithub.com%2FLuigiRaffaeleSianoCanoro%2Fshiplog%2Fblob%2Ffeat%2Fmvp%2Fdocs%2Fself-host.md)
+
+After deploy, connect a **private** Vercel Blob store, set `SHIPLOG_INSTALL_ORIGIN` to your production URL, and create your own Origin App with the same events and scopes as below. For **zero LLM cost**, set `SHIPLOG_BYOK_ENABLED=false` (keyless prompt mode).
+
 ## Origin App settings
 - Webhook URL: `https://<deploy>/api/webhooks/origin`. Callback / redirect URL: `https://<deploy>/api/install/callback`
 - Events: `pull_request.merged`, `pull_request.comment.created`, `repository.pushed` (installation.* are always sent)
-- Scopes: PR read + `repository:pull_requests:reviews:write` (comments). Only if Shiplog writes PRs itself: `repository:pull_requests:write`, `repository:contents:write`.
+- Scopes: PR read (includes listing changed files for monorepo routing) + `repository:pull_requests:reviews:write` (comments). Only if Shiplog writes PRs itself: `repository:pull_requests:write`, `repository:contents:write`.
 
 ## Develop
 ```bash

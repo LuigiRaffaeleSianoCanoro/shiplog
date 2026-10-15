@@ -80,4 +80,10 @@ export class BlobStore implements Store {
     if (cur?.token === this.cronPollToken) await del(CRON_LOCK);
     this.cronPollToken = null;
   }
+  async getNotifyWebhooks(id: string) { return (await this.getInstallation(id))?.notifyWebhooks ?? []; }
+  async putNotifyWebhooks(id: string, webhooks: string[]) {
+    const prev = await this.getInstallation(id);
+    if (!prev) throw new Error("unknown installation");
+    await this.upsertInstallation({ ...prev, notifyWebhooks: webhooks });
+  }
 }

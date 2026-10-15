@@ -51,4 +51,12 @@ export class MemoryStore implements Store {
       this.cronPollToken = null;
     }
   }
+  getNotifyWebhooks(id: string) { return this.tx((d) => d.installations[id]?.notifyWebhooks ?? []); }
+  putNotifyWebhooks(id: string, webhooks: string[]) {
+    return this.tx((d) => {
+      const prev = d.installations[id];
+      if (!prev) throw new Error("unknown installation");
+      d.installations[id] = { ...prev, notifyWebhooks: webhooks };
+    });
+  }
 }

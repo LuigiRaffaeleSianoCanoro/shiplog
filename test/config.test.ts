@@ -62,11 +62,46 @@ describe("no-changelog and Origin author fields", () => {
   });
 });
 
+describe("history option", () => {
+  it("defaults on with sensible caps", () => {
+    expect(DEFAULT_CONFIG.history.enabled).toBe(true);
+    expect(DEFAULT_CONFIG.history.maxPrs).toBe(100);
+    expect(parseConfig("history:\n  enabled: false\n  max_prs: 25").history).toEqual({ enabled: false, maxPrs: 25, maxTags: 50 });
+  });
+});
+
 describe("batch option", () => {
   it("accepts release and daily, defaults to off", () => {
     expect(parseConfig("batch: release").batch).toBe("release");
     expect(parseConfig("batch: daily").batch).toBe("daily");
     expect(parseConfig("batch: hourly").batch).toBe("off");
     expect(DEFAULT_CONFIG.batch).toBe("off");
+  });
+});
+
+describe("monorepo packages", () => {
+  it("defaults to empty packages and orphan root", () => {
+    expect(DEFAULT_CONFIG.packages).toEqual([]);
+    expect(DEFAULT_CONFIG.orphan).toBe("root");
+  });
+
+  it("parses packages and orphan ignore", () => {
+    const c = parseConfig(`
+packages:
+  web:
+    paths: [packages/web/**]
+    changelog: packages/web/CHANGELOG.md
+orphan: ignore
+`);
+    expect(c.packages[0]).toMatchObject({ name: "web", changelogPath: "packages/web/CHANGELOG.md" });
+    expect(c.orphan).toBe("ignore");
+  });
+});
+
+describe("notify.webhooks", () => {
+  it("reads webhook URLs from config", () => {
+    const c = parseConfig("notify:\n  webhooks:\n    - https://hooks.slack.com/services/A/B/C\n    - https://example.com/h\n");
+    expect(c.notify.webhooks).toEqual(["https://hooks.slack.com/services/A/B/C", "https://example.com/h"]);
+    expect(parseConfig(null).notify.webhooks).toEqual([]);
   });
 });

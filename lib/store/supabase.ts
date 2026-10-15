@@ -67,4 +67,13 @@ export class SupabaseStore implements Store {
   async releaseCronPollLock() {
     await this.q(`shiplog_deliveries?id=eq.${SupabaseStore.CRON_LOCK}`, { method: "DELETE" });
   }
+  private notifyKey(id: string) { return `@notify:${id}`; }
+  async getNotifyWebhooks(id: string) {
+    const raw = await this.getChangelog(this.notifyKey(id));
+    if (!raw) return [];
+    try { return (JSON.parse(raw) as { webhooks?: string[] }).webhooks ?? []; } catch { return []; }
+  }
+  async putNotifyWebhooks(id: string, webhooks: string[]) {
+    await this.putChangelog(this.notifyKey(id), JSON.stringify({ webhooks }));
+  }
 }
