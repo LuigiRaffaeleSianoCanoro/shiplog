@@ -42,3 +42,8 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR pe
 
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
 - Item 1. Enable secret scanning, push protection, Dependabot and private vulnerability reporting in GitHub settings. Add CODEOWNERS and issue templates.
+
+- 2026-10-15. Item 9. No Neon AI Gateway credentials on the build box, so implement, test and review were done directly by the agent (same as items 1 to 8).
+- 2026-10-15. Item 9. Initial changelog backfill runs on `installation.created` (all installation repos) and lazily on the first repo webhook when a repo was not covered yet. Idempotency uses `historyBackfillAt` on the installation record plus a check that the repo changelog file is still empty.
+- 2026-10-15. Item 9. History is built deterministically from merged PR titles (Keep a Changelog sections, exclude labels) and semver tags (tag commit time when Origin returns it). It commits through `git/commits:createFromFiles` when Origin is configured; neon test mode also mirrors into stored changelog.
+- 2026-10-15. Item 9. `.shiplog.yml` accepts `history.enabled`, `history.max_prs` and `history.max_tags` (snake_case aliases). Default helps first-time installs without extra config.

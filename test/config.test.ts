@@ -62,6 +62,14 @@ describe("no-changelog and Origin author fields", () => {
   });
 });
 
+describe("history option", () => {
+  it("defaults on with sensible caps", () => {
+    expect(DEFAULT_CONFIG.history.enabled).toBe(true);
+    expect(DEFAULT_CONFIG.history.maxPrs).toBe(100);
+    expect(parseConfig("history:\n  enabled: false\n  max_prs: 25").history).toEqual({ enabled: false, maxPrs: 25, maxTags: 50 });
+  });
+});
+
 describe("batch option", () => {
   it("accepts release and daily, defaults to off", () => {
     expect(parseConfig("batch: release").batch).toBe("release");

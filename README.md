@@ -31,7 +31,13 @@ tone: concise, user-facing
 changelog: CHANGELOG.md
 mode: agent          # or "prompt": never launch an agent, post a ready-to-run prompt instead
 batch: off           # "release": one agent per release; "daily": one agent per repo per day (cron)
+history:             # initial CHANGELOG backfill on install (merged PRs + semver tags)
+  enabled: true
+  max_prs: 100
+  max_tags: 50
 ```
+
+On first install (and on the first webhook per repo), Shiplog can seed `CHANGELOG.md` from merged pull requests and existing semver tags when the file is still empty. Re-runs are skipped unless you call `POST /api/history/backfill` from an authenticated setup session with `{ "installationId", "repo?", "force": true }`.
 
 ## PR commands
 

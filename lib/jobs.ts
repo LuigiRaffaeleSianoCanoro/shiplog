@@ -7,6 +7,7 @@ import { getRun, launchAgent } from "./cursor";
 import { open, parseMasterKey } from "./crypto";
 import { commentOnPr, getInstallationInfo, getRepoFile, listPrComments, originConfigured, repoPermission } from "./origin";
 import { CONFIG_PATH, DEFAULT_CONFIG, excludedBy, parseConfig, sectionFor, type ShiplogConfig } from "./config";
+import { backfillInstallation, maybeBackfillOnFirstVisit } from "./backfill";
 
 export interface Envelope {
   deliveryId?: string; installationId: string;
@@ -107,6 +108,9 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
 
   if (type === "installation.created" || type === "installation.unsuspended" || type === "installation.updated") {
     await store.upsertInstallation({ id: instId, namespace: payload?.installation?.account?.slug ?? payload?.installation?.namespace?.slug ?? "", status: "active", createdAt: now, disconnectedAt: null });
+    if (type === "installation.created") {
+      backfillInstallation(instId).catch((e) => console.error("[shiplog] install history backfill:", (e as Error).message));
+    }
     return null;
   }
   if (type === "installation.suspended") {
@@ -126,6 +130,7 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
   if (!inst) await store.upsertInstallation({ id: instId, namespace: payload?.repository?.owner?.slug ?? "", status: "active", createdAt: now });
 
   const repo = repoOf(payload);
+  if (repo !== "unknown/unknown") await maybeBackfillOnFirstVisit(instId, repo);
   const pr = payload?.pullRequest;
   let kind: Job["kind"] | null = null;
   let version: string | null = null;

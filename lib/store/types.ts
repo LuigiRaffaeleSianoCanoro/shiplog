@@ -1,7 +1,12 @@
 import type { Sealed } from "../crypto";
 
 export type InstallStatus = "active" | "suspended" | "disconnected";
-export interface Installation { id: string; namespace: string; status: InstallStatus; createdAt: string; disconnectedAt?: string | null; installerId?: string | null; namespaceType?: "user" | "team" | null }
+export interface Installation {
+  id: string; namespace: string; status: InstallStatus; createdAt: string; disconnectedAt?: string | null;
+  installerId?: string | null; namespaceType?: "user" | "team" | null;
+  /** Per-repo backfill marker (ISO timestamp or skipped:reason:time). */
+  historyBackfillAt?: Record<string, string>;
+}
 export type KeyKind = "personal" | "service_account";
 export interface UserKey extends Sealed { installationId: string; last4: string; createdAt: string; kind?: KeyKind; rotatedAt?: string | null }
 export type JobKind = "changelog" | "release";
