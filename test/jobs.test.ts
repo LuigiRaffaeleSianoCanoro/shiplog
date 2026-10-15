@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { randomBytes } from "node:crypto";
+import { generateKeyPairSync, randomBytes } from "node:crypto";
 
 const master = randomBytes(32).toString("base64");
 
 async function setup(envOver: Record<string, string>) {
   vi.resetModules();
-  for (const k of ["SHIPLOG_LLM_PROVIDER", "SHIPLOG_BYOK_ENABLED", "SUPABASE_URL", "ORIGIN_APP_ID"]) delete process.env[k];
+  for (const k of ["SHIPLOG_LLM_PROVIDER", "SHIPLOG_BYOK_ENABLED", "SUPABASE_URL", "ORIGIN_APP_ID", "ORIGIN_APP_PRIVATE_KEY"]) delete process.env[k];
   Object.assign(process.env, { SHIPLOG_KEY_ENC: master, ...envOver });
   const { MemoryStore } = await import("@/lib/store/memory");
   const storeMod = await import("@/lib/store");
@@ -92,6 +92,57 @@ describe("job flows", () => {
   it("dedupes delivery ids", async () => {
     const { store } = await setup({});
     expect(await store.claimDelivery("x")).toBe(true); expect(await store.claimDelivery("x")).toBe(false);
+  });
+});
+
+describe(".shiplog.yml in jobs", () => {
+  const pem = generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  /** Fake Origin: serves .shiplog.yml from the contents API and accepts tokens and comments. */
+  const origin = (yml: string | null) => vi.fn(async (url: string) => {
+    const u = String(url);
+    if (u.includes("/access_tokens")) return new Response(JSON.stringify({ token: "tok" }));
+    if (u.includes("/contents")) return yml === null ? new Response("{}", { status: 404 }) : new Response(JSON.stringify({ type: "file", encoding: "base64", content: Buffer.from(yml).toString("base64") }));
+    return new Response("{}");
+  });
+  const env_ = { ORIGIN_APP_ID: "app_1", ORIGIN_APP_PRIVATE_KEY: pem };
+
+  it("skips a PR excluded by label without commenting", async () => {
+    const { store, jobs } = await setup(env_);
+    vi.stubGlobal("fetch", origin("exclude:\n  labels: [skip-changelog]"));
+    const ev = merged("12", "feat: x"); (ev.event.payload.pullRequest as any).labels = [{ name: "skip-changelog" }];
+    const job = await jobs.handleEvent(ev, "c1");
+    expect(job?.status).toBe("ignored"); expect(job?.result).toContain("skip-changelog");
+    expect(await store.listOutbox()).toHaveLength(0);
+    vi.unstubAllGlobals();
+  });
+
+  it("skips bot authors listed in exclude.authors", async () => {
+    const { jobs } = await setup(env_);
+    vi.stubGlobal("fetch", origin("exclude:\n  authors: [dependabot]"));
+    const ev = merged("13", "chore(deps): bump"); (ev.event.payload.pullRequest as any).author = { user: { slug: "dependabot" } };
+    expect((await jobs.handleEvent(ev, "c2"))?.status).toBe("ignored");
+    vi.unstubAllGlobals();
+  });
+
+  it("mode: prompt never launches an agent, and the prompt honors path, language and sections", async () => {
+    const { store, jobs } = await setup(env_);
+    const { seal, parseMasterKey } = await import("@/lib/crypto");
+    await store.putKey({ ...seal("key_abcdefghijklmnop", parseMasterKey(master), "i_1"), installationId: "i_1", last4: "mnop", createdAt: "" });
+    const f = origin("mode: prompt\nlanguage: es\nchangelog: docs/CHANGES.md\nsections:\n  deps: Security");
+    vi.stubGlobal("fetch", f);
+    const job = await jobs.handleEvent(merged("14", "deps: bump openssl"), "c3");
+    expect(job?.mode).toBe("fallback");
+    expect(f.mock.calls.some((c: any) => String(c[0]).includes("/v1/agents"))).toBe(false);
+    expect(job?.result).toContain("docs/CHANGES.md"); expect(job?.result).toContain("### Security"); expect(job?.result).toContain("es");
+    vi.unstubAllGlobals();
+  });
+
+  it("missing .shiplog.yml uses defaults", async () => {
+    const { jobs } = await setup(env_);
+    vi.stubGlobal("fetch", origin(null));
+    const job = await jobs.handleEvent(merged("15", "fix: y"), "c4");
+    expect(job?.status).toBe("done"); expect(job?.result).toContain("CHANGELOG.md");
+    vi.unstubAllGlobals();
   });
 });
 

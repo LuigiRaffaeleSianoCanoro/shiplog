@@ -47,3 +47,13 @@ export async function repoPermission(installationId: string, repo: string, userI
   if (!r.ok) return null;
   return ((await r.json()) as { permission?: string }).permission ?? null;
 }
+
+/** A text file from the repo's default branch (needs repository:contents:read). null when absent. */
+export async function getRepoFile(installationId: string, repo: string, path: string): Promise<string | null> {
+  const [owner, name] = repo.split("/");
+  const token = await installationToken(installationId);
+  const r = await fetch(`${env.originApi}/repos/${owner}/${name}/contents?path=${encodeURIComponent(path)}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+  if (!r.ok) return null;
+  const j = (await r.json()) as { type?: string; content?: string };
+  return j.type === "file" && j.content ? Buffer.from(j.content, "base64").toString("utf8") : null;
+}
