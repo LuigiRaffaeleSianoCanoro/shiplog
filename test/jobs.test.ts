@@ -302,6 +302,58 @@ describe("batch mode", () => {
   });
 });
 
+describe("monorepo packages", () => {
+  const pem = generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  const env_ = { ORIGIN_APP_ID: "app_1", ORIGIN_APP_PRIVATE_KEY: pem };
+  const yml = `packages:
+  web:
+    paths: [packages/web/**]
+    changelog: packages/web/CHANGELOG.md
+  api:
+    paths: [packages/api/**]
+    changelog: packages/api/CHANGELOG.md
+orphan: ignore`;
+
+  const origin = (files: string[]) => vi.fn(async (url: string, init?: any) => {
+    const u = String(url);
+    if (u.includes("/access_tokens")) return new Response(JSON.stringify({ token: "tok" }));
+    if (u.includes("/contents") && u.includes(".shiplog.yml")) return new Response(JSON.stringify({ type: "file", content: Buffer.from(yml).toString("base64") }));
+    if (u.includes("/files")) return new Response(JSON.stringify({ files: files.map((f) => ({ filename: f })) }));
+    if (u.includes("/comments") && init?.method !== "POST") return new Response(JSON.stringify({ comments: [] }));
+    return new Response("{}");
+  });
+
+  it("neon mode updates each package changelog from PR files", async () => {
+    const { store, jobs } = await setup({ ...env_, SHIPLOG_LLM_PROVIDER: "neon", NEON_AI_GATEWAY_BASE_URL: "https://gw.test", NEON_AI_GATEWAY_TOKEN: "t" });
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const u = String(url);
+      if (u.includes("gw.test")) return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ section: "Added", bullet: "Widget" }) } }] }));
+      return origin(["packages/web/a.ts", "packages/api/b.ts"])(url);
+    }));
+    await jobs.handleEvent(merged("60", "feat: widgets"), "m1");
+    expect(await store.getChangelog("luigi/demo::packages/web/CHANGELOG.md")).toContain("Widget (#60)");
+    expect(await store.getChangelog("luigi/demo::packages/api/CHANGELOG.md")).toContain("Widget (#60)");
+    vi.unstubAllGlobals();
+  });
+
+  it("orphan-only PRs are ignored when orphan is ignore", async () => {
+    const { jobs } = await setup(env_);
+    vi.stubGlobal("fetch", origin(["README.md"]));
+    const job = await jobs.handleEvent(merged("61", "docs: readme"), "m2");
+    expect(job?.status).toBe("ignored");
+    vi.unstubAllGlobals();
+  });
+
+  it("fallback prompt lists every targeted changelog", async () => {
+    const { jobs } = await setup(env_);
+    vi.stubGlobal("fetch", origin(["packages/web/a.ts"]));
+    const job = await jobs.handleEvent(merged("62", "feat: ui"), "m3");
+    expect(job?.result).toContain("packages/web/CHANGELOG.md");
+    expect(job?.result).not.toContain("packages/api/CHANGELOG.md");
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("llm content shapes", () => {
   it("accepts array-of-blocks content", async () => {
     vi.resetModules();

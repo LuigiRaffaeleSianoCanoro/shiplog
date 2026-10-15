@@ -31,7 +31,17 @@ tone: concise, user-facing
 changelog: CHANGELOG.md
 mode: agent          # or "prompt": never launch an agent, post a ready-to-run prompt instead
 batch: off           # "release": one agent per release; "daily": one agent per repo per day (cron)
+packages:            # optional monorepo: one changelog per package (roadmap item 13)
+  web:
+    paths: [packages/web/**]
+    changelog: packages/web/CHANGELOG.md
+  api:
+    paths: [packages/api/**]
+    changelog: packages/api/CHANGELOG.md
+orphan: root         # when packages is set: root = unmatched files use `changelog`; ignore = skip them
 ```
+
+When `packages` is set, Shiplog loads the merged PR's changed files from the Origin API (`GET .../pulls/{number}/files`, scope `repository:pull_requests:read`, already requested) and drafts an entry in every matching package changelog. `/shiplog` commands, labels and classification apply to all targeted changelogs for that PR. Release comments include a semver suggestion per changelog file.
 
 ## PR commands
 
@@ -54,7 +64,7 @@ The `no-changelog` label always skips a PR, as does any label in `exclude.labels
 ## Origin App settings
 - Webhook URL: `https://<deploy>/api/webhooks/origin`. Callback / redirect URL: `https://<deploy>/api/install/callback`
 - Events: `pull_request.merged`, `pull_request.comment.created`, `repository.pushed` (installation.* are always sent)
-- Scopes: PR read + `repository:pull_requests:reviews:write` (comments). Only if Shiplog writes PRs itself: `repository:pull_requests:write`, `repository:contents:write`.
+- Scopes: PR read (includes listing changed files for monorepo routing) + `repository:pull_requests:reviews:write` (comments). Only if Shiplog writes PRs itself: `repository:pull_requests:write`, `repository:contents:write`.
 
 ## Develop
 ```bash

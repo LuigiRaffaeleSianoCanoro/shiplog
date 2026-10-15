@@ -10,6 +10,8 @@ export interface Job {
   id: string; deliveryId: string; installationId: string; repo: string; prNumber: string; prUrl: string;
   kind: JobKind; mode: JobMode; status: "queued" | "running" | "done" | "failed" | "ignored";
   agentId?: string | null; runId?: string | null; prOpened?: string | null; result?: string | null; createdAt: string;
+  /** Changelog paths this job updates (monorepo). */
+  changelogPaths?: string[];
 }
 export interface Outbox { id: string; installationId: string; repo: string; prNumber: string; body: string; delivered: boolean; createdAt: string }
 

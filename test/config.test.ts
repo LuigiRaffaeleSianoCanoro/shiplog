@@ -70,3 +70,22 @@ describe("batch option", () => {
     expect(DEFAULT_CONFIG.batch).toBe("off");
   });
 });
+
+describe("monorepo packages", () => {
+  it("defaults to empty packages and orphan root", () => {
+    expect(DEFAULT_CONFIG.packages).toEqual([]);
+    expect(DEFAULT_CONFIG.orphan).toBe("root");
+  });
+
+  it("parses packages and orphan ignore", () => {
+    const c = parseConfig(`
+packages:
+  web:
+    paths: [packages/web/**]
+    changelog: packages/web/CHANGELOG.md
+orphan: ignore
+`);
+    expect(c.packages[0]).toMatchObject({ name: "web", changelogPath: "packages/web/CHANGELOG.md" });
+    expect(c.orphan).toBe("ignore");
+  });
+});
