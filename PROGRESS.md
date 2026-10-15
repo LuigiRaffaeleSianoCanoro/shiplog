@@ -53,6 +53,11 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - 2026-10-15. Item 10. Default recommendation for self-hosters is keyless mode (`SHIPLOG_BYOK_ENABLED=false`) for US$0 LLM spend; BYOK remains the production default for the maintainer deploy.
 - 2026-10-15. Item 10. No Neon AI Gateway on the build box; `npm test` and `npm run build` were run on the agent VM only. The first `next build` failed on a transient `next/font` Google fetch error; a immediate retry succeeded.
 
+- 2026-10-15. Item 11. Polling stays on Vercel Cron plus optional external schedulers. No Supabase `pg_cron` or `pg_net` (owner decision). `vercel.json` keeps the daily Hobby schedule; Pro and GitHub Actions are documented for faster intervals.
+- 2026-10-15. Item 11. `/api/cron/poll` uses constant-time `CRON_SECRET` bearer auth and fails closed when the secret is unset. Overlapping callers get `{ skipped: true }` via a store-backed lock (`CRON_POLL_LOCK_TTL_MS`, default 90s).
+- 2026-10-15. Item 11. `flushBatches` re-checks queued jobs before launch; `pollAgents` posts the PR comment only on the first transition to a PR URL.
+- 2026-10-15. Item 11. Implement, test and self-review were done directly on the agent VM. The Neon AI Gateway is not reachable from this environment (same as item 1).
+
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).

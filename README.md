@@ -118,7 +118,15 @@ Production: https://shiplog-luigi-canoros-projects.vercel.app. Vercel Authentica
 
 Origin App settings: webhook URL `https://shiplog-luigi-canoros-projects.vercel.app/api/webhooks/origin`, callback URL `https://shiplog-luigi-canoros-projects.vercel.app/api/install/callback`.
 
-Polling: Vercel Hobby cron runs once a day (`vercel.json`), and the dashboard also polls whenever it is viewed. For minute-level polling, use Supabase `pg_cron` + `pg_net` to call `/api/cron/poll` with `CRON_SECRET`.
+Polling: `vercel.json` registers a Vercel Cron job on `GET /api/cron/poll` (daily on Hobby). Set `CRON_SECRET` in the project; Vercel sends `Authorization: Bearer <CRON_SECRET>` on cron invocations. The handler is idempotent and skips work when another poll is already running (see `CRON_POLL_LOCK_TTL_MS`).
+
+**Hobby limits:** Vercel Hobby cron jobs run at most once per day. That is enough for `batch: daily` flushes, but agent PR links can wait until the next run unless something else polls.
+
+**More frequent polling (no extra Vercel cost):**
+- **Vercel Pro:** change the `schedule` in `vercel.json` (for example `*/15 * * * *` for every 15 minutes). Pro billing applies to the project.
+- **External pinger (free):** call `https://<your-host>/api/cron/poll` on a schedule with `Authorization: Bearer $CRON_SECRET`. A copy-paste GitHub Actions workflow lives at `docs/ci/cron-poll.yml` (public repos get free Actions minutes).
+
+The dashboard still calls `pollAgents()` when you open it (no `CRON_SECRET`); it does not flush `batch: daily` queues, so viewing the dashboard does not spend agent credits.
 
 ## Publishing (not done yet)
 Per https://cursor.com/docs/origin/apps/publish:

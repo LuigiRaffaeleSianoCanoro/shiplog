@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { Installation, Job, Outbox, Store, UserKey } from "./types";
@@ -9,6 +10,8 @@ const empty = (): Data => ({ deliveries: [], installations: {}, keys: {}, jobs: 
 export class MemoryStore implements Store {
   private data: Data = empty();
   private loaded = false;
+  private cronPollLock: { expiresAt: number; token: string } | null = null;
+  private cronPollToken: string | null = null;
   constructor(private file?: string) {}
   private async load() {
     if (this.loaded) return; this.loaded = true;
@@ -34,6 +37,20 @@ export class MemoryStore implements Store {
   listOutbox(id?: string) { return this.tx((d) => d.outbox.filter((o) => !id || o.installationId === id)); }
   getChangelog(repo: string) { return this.tx((d) => d.changelogs[repo] ?? null); }
   putChangelog(repo: string, md: string) { return this.tx((d) => { d.changelogs[repo] = md; }); }
+  async acquireCronPollLock(ttlMs: number) {
+    const now = Date.now();
+    if (this.cronPollLock && this.cronPollLock.expiresAt > now) return false;
+    const token = randomUUID();
+    this.cronPollLock = { expiresAt: now + ttlMs, token };
+    this.cronPollToken = token;
+    return true;
+  }
+  async releaseCronPollLock() {
+    if (this.cronPollToken && this.cronPollLock?.token === this.cronPollToken) {
+      this.cronPollLock = null;
+      this.cronPollToken = null;
+    }
+  }
   getNotifyWebhooks(id: string) { return this.tx((d) => d.installations[id]?.notifyWebhooks ?? []); }
   putNotifyWebhooks(id: string, webhooks: string[]) {
     return this.tx((d) => {

@@ -52,6 +52,21 @@ export class SupabaseStore implements Store {
   async putChangelog(repo: string, md: string) {
     await this.q("shiplog_changelogs?on_conflict=repo", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal", body: JSON.stringify({ repo, markdown: md, updated_at: new Date().toISOString() }) });
   }
+  private static CRON_LOCK = "__cron_poll_lock__";
+  async acquireCronPollLock(ttlMs: number) {
+    const rows = await this.rows<{ received_at: string }>(`shiplog_deliveries?id=eq.${SupabaseStore.CRON_LOCK}`);
+    const now = Date.now();
+    if (rows[0]) {
+      const age = now - new Date(rows[0].received_at).getTime();
+      if (age < ttlMs) return false;
+      await this.q(`shiplog_deliveries?id=eq.${SupabaseStore.CRON_LOCK}`, { method: "DELETE" });
+    }
+    const r = await this.q("shiplog_deliveries", { method: "POST", body: JSON.stringify({ id: SupabaseStore.CRON_LOCK }), prefer: "return=minimal" });
+    return r.status !== 409;
+  }
+  async releaseCronPollLock() {
+    await this.q(`shiplog_deliveries?id=eq.${SupabaseStore.CRON_LOCK}`, { method: "DELETE" });
+  }
   private notifyKey(id: string) { return `@notify:${id}`; }
   async getNotifyWebhooks(id: string) {
     const raw = await this.getChangelog(this.notifyKey(id));

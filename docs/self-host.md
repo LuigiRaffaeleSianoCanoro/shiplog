@@ -49,6 +49,7 @@ Set these in the Vercel project **Settings → Environment Variables** for Produ
 - `ORIGIN_APP_PRIVATE_KEY` — PEM private key from the app. In Vercel, paste the full key; you may use `\n` for newlines in a single line.
 - `SHIPLOG_KEY_ENC` — 32-byte AES master key, base64. Generate with `openssl rand -base64 32`. Used to encrypt stored Cursor API keys at rest.
 - `CRON_SECRET` — random string; required so `/api/cron/poll` is not public. Cron requests must send `Authorization: Bearer <CRON_SECRET>`.
+- `CRON_POLL_LOCK_TTL_MS` — optional; overlap-guard TTL in milliseconds for concurrent `/api/cron/poll` requests (default 90000).
 - `SHIPLOG_INSTALL_ORIGIN` — canonical HTTPS origin of **this** deployment, no trailing slash (for example `https://shiplog-yourname.vercel.app`). Must match an entry in the Origin app `installationRedirectUris`. Installs started on another host redirect here first.
 
 ### AI and cost mode (pick one posture)

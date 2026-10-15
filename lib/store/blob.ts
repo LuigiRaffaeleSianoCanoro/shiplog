@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { del, get, list, put } from "@vercel/blob";
 import type { Installation, Job, Outbox, Store, UserKey } from "./types";
 
@@ -25,8 +26,11 @@ async function readAll<T>(prefix: string, limit = 100): Promise<T[]> {
 }
 // Reverse-chronological sortable prefix so newest-first listing is a string sort.
 const rev = (iso: string) => String(9_999_999_999_999 - new Date(iso || Date.now()).getTime()).padStart(13, "0");
+const CRON_LOCK = `${P}/locks/cron-poll.json`;
+type CronPollLock = { expiresAt: string; token: string };
 
 export class BlobStore implements Store {
+  private cronPollToken: string | null = null;
   async claimDelivery(id: string) {
     try { await put(`${P}/deliveries/${enc(id)}.json`, "{}", { ...opts, allowOverwrite: false }); return true; }
     catch (e) { if (/already exists|precondition|409/i.test(String((e as Error).message))) return false; throw e; }
@@ -50,6 +54,32 @@ export class BlobStore implements Store {
   async listOutbox(id?: string) { return readAll<Outbox>(id ? `${P}/outbox/${enc(id)}/` : `${P}/outbox/`, 50); }
   async getChangelog(repo: string) { return (await readJson<{ markdown: string }>(`${P}/changelogs/${enc(repo)}.json`))?.markdown ?? null; }
   async putChangelog(repo: string, md: string) { await write(`${P}/changelogs/${enc(repo)}.json`, { markdown: md, updatedAt: new Date().toISOString() }); }
+  async acquireCronPollLock(ttlMs: number) {
+    const now = Date.now();
+    const cur = await readJson<CronPollLock>(CRON_LOCK);
+    if (cur && Date.parse(cur.expiresAt) > now) return false;
+    const lock: CronPollLock = { expiresAt: new Date(now + ttlMs).toISOString(), token: randomUUID() };
+    if (!cur) {
+      try {
+        await put(CRON_LOCK, JSON.stringify(lock), { ...opts, allowOverwrite: false });
+        this.cronPollToken = lock.token;
+        return true;
+      } catch (e) {
+        if (!/already exists|precondition|409/i.test(String((e as Error).message))) throw e;
+      }
+    }
+    const again = await readJson<CronPollLock>(CRON_LOCK);
+    if (again && Date.parse(again.expiresAt) > now) return false;
+    await write(CRON_LOCK, lock);
+    this.cronPollToken = lock.token;
+    return true;
+  }
+  async releaseCronPollLock() {
+    if (!this.cronPollToken) return;
+    const cur = await readJson<CronPollLock>(CRON_LOCK);
+    if (cur?.token === this.cronPollToken) await del(CRON_LOCK);
+    this.cronPollToken = null;
+  }
   async getNotifyWebhooks(id: string) { return (await this.getInstallation(id))?.notifyWebhooks ?? []; }
   async putNotifyWebhooks(id: string, webhooks: string[]) {
     const prev = await this.getInstallation(id);

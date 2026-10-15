@@ -369,17 +369,23 @@ export async function flushBatches(): Promise<number> {
     }
   }
   let launched = 0;
-  for (const { installationId, repo, path, jobs: queued } of groups.values()) {
+  const flushed = new Set<string>(); // jobs batched by this run (a PR can span several package changelogs)
+  for (const { installationId, repo, path, jobs: grp } of groups.values()) {
+    const ids = new Set(grp.map((j) => j.id));
+    // Re-read so an overlapping poll that already batched these jobs is not repeated.
+    const live = (await store.listJobs()).filter((j) => ids.has(j.id) && (flushed.has(j.id) || (j.status === "queued" && batchOf(j) === "daily")));
+    if (!live.length) continue;
     try {
       const key = await userKey(installationId);
       if (!key) continue;
       const cfg = await loadConfig(installationId, repo);
       const changelogPath = path === "__default__" ? cfg.changelogPath : path;
-      const entries = queued.map(entryOf);
+      const entries = live.map(entryOf);
       const l = await launchAgent(key, batchPrompt(repo, entries, styleOf(cfg, changelogPath), undefined, undefined, changelogPath), repoUrl(repo));
       const job: Job = { id: randomUUID(), deliveryId: `batch-${randomUUID()}`, installationId, repo, prNumber: "", prUrl: repoUrl(repo), kind: "changelog", mode: "cursor", status: "running", agentId: l.agentId, runId: l.runId, changelogPaths: [changelogPath], result: `agent ${l.agentId} (${entries.length} queued PRs)`, createdAt: new Date().toISOString() };
       await store.putJob(job);
-      await markBatched(queued, job.id);
+      for (const j of live) flushed.add(j.id);
+      await markBatched(live, job.id);
       launched++;
     } catch (e) { console.error("[shiplog] batch flush failed:", (e as Error).message); }
   }
@@ -418,11 +424,12 @@ export async function pollAgents(): Promise<number> {
       if (!key) { job.status = "failed"; job.result = "key removed"; await store.putJob(job); continue; }
       const run = await getRun(key, job.agentId!, job.runId!);
       if (run.prUrl || TERMINAL.has(run.status)) {
+        const announce = Boolean(run.prUrl && !job.prOpened);
         job.prOpened = run.prUrl;
         job.status = run.prUrl ? "done" : "failed";
         job.result = run.prUrl ? `PR ${run.prUrl}` : `agent ${run.status}`;
         await store.putJob(job); updated++;
-        if (run.prUrl) {
+        if (announce) {
           const paths = job.changelogPaths?.length ? job.changelogPaths : ["CHANGELOG.md"];
           await postComment(job.installationId, job.repo, job.prNumber, `**Shiplog** opened ${run.prUrl} updating ${pathsLabel(paths)}.`);
           const cfg = await loadConfig(job.installationId, job.repo);
