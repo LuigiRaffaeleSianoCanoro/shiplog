@@ -183,7 +183,16 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
   const now = new Date().toISOString();
 
   if (type === "installation.created" || type === "installation.unsuspended" || type === "installation.updated") {
-    await store.upsertInstallation({ id: instId, namespace: payload?.installation?.account?.slug ?? payload?.installation?.namespace?.slug ?? "", status: "active", createdAt: now, disconnectedAt: null });
+    const prev = await store.getInstallation(instId);
+    await store.upsertInstallation({
+      ...(prev ?? { id: instId, namespace: "", createdAt: now }),
+      id: instId,
+      provider: prev?.provider ?? "origin",
+      namespace: payload?.installation?.account?.slug ?? payload?.installation?.namespace?.slug ?? prev?.namespace ?? "",
+      status: "active",
+      createdAt: prev?.createdAt ?? now,
+      disconnectedAt: null,
+    });
     if (type === "installation.created") {
       backfillInstallation(instId).catch((e) => console.error("[shiplog] install history backfill:", (e as Error).message));
     }
@@ -191,19 +200,27 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
   }
   if (type === "installation.suspended") {
     const i = await store.getInstallation(instId);
-    await store.upsertInstallation({ ...(i ?? { id: instId, namespace: "", createdAt: now }), status: "suspended" });
+    await store.upsertInstallation({ ...(i ?? { id: instId, namespace: "", createdAt: now, provider: "origin" }), status: "suspended" });
     return null;
   }
   if (type === "installation.deleted") {
     const i = await store.getInstallation(instId);
-    await store.upsertInstallation({ ...(i ?? { id: instId, namespace: "", createdAt: now }), status: "disconnected", disconnectedAt: now });
+    await store.upsertInstallation({ ...(i ?? { id: instId, namespace: "", createdAt: now, provider: "origin" }), status: "disconnected", disconnectedAt: now });
     await store.deleteKey(instId);
     return null;
   }
 
   const inst = await store.getInstallation(instId);
   if (inst && inst.status !== "active") return null; // disconnected/suspended: ignore webhooks
-  if (!inst) await store.upsertInstallation({ id: instId, namespace: payload?.repository?.owner?.slug ?? "", status: "active", createdAt: now });
+  if (!inst) {
+    await store.upsertInstallation({
+      id: instId,
+      provider: "origin",
+      namespace: payload?.repository?.owner?.slug ?? "",
+      status: "active",
+      createdAt: now,
+    });
+  }
 
   const repo = repoOf(payload);
   if (repo !== "unknown/unknown") await maybeBackfillOnFirstVisit(instId, repo);

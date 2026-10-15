@@ -63,6 +63,22 @@ For **Neon test mode** only (`SHIPLOG_LLM_PROVIDER=neon`):
 - `NEON_AI_GATEWAY_TOKEN`
 - `SHIPLOG_NEON_MODEL` (optional, default `claude-opus-5-5`)
 
+### Optional GitHub App (same Vercel deploy)
+
+For GitHub-native or GitHub-mirrored repos (tag pushes and webhooks from GitHub), create a **GitHub App** and set:
+
+- `GITHUB_APP_ID` — numeric app id from GitHub App settings.
+- `GITHUB_APP_PRIVATE_KEY` — PEM private key generated for the app (paste in Vercel; `\n` escapes allowed).
+- `GITHUB_WEBHOOK_SECRET` — secret you configure on the GitHub App webhook (used for `X-Hub-Signature-256`).
+
+In the GitHub App settings:
+
+- **Webhook URL:** `https://<your-vercel-host>/api/webhooks/github`
+- **Setup URL (optional but recommended):** `https://<your-vercel-host>/api/github/install/callback`
+- **Events:** `Installation`, `Pull request`, `Issue comments`, `Pull request review comments`, `Push` (for tags)
+
+Users can install with `https://<your-host>/api/github/install/start` (same `SHIPLOG_INSTALL_ORIGIN` bounce rules as Origin). Origin App install remains the primary path; both providers can be installed on the same host with separate installation records.
+
 ### Optional
 
 - `SHIPLOG_DASHBOARD_TOKEN` — if set, the all-installations dashboard requires `?token=` or a `Authorization: Bearer` header with this value.
@@ -89,8 +105,9 @@ After deploy, public changelog JSON is available at `/api/v1/changelogs/{namespa
 ## 4. Install Shiplog in your namespace
 
 1. Confirm `GET https://<your-host>/api/health` returns `ok: true` and `storage: "vercel-blob"`.
-2. Open `https://<your-host>/api/install/start` while logged into Cursor. Complete the Origin consent screen for your user or team namespace.
-3. On `/setup`, either paste a Cursor API key (BYOK) or, if you set `SHIPLOG_BYOK_ENABLED=false`, finish setup without a key and use prompt-only changelog updates.
+2. **Origin (primary):** open `https://<your-host>/api/install/start` while logged into Cursor. Complete the Origin consent screen for your user or team namespace.
+3. **GitHub App (optional):** open `https://<your-host>/api/github/install/start` while logged into GitHub. Pick the org or user and repositories on GitHub.
+4. On `/setup`, either paste a Cursor API key (BYOK) or, if you set `SHIPLOG_BYOK_ENABLED=false`, finish setup without a key and use prompt-only changelog updates.
 
 ## 5. Verify
 

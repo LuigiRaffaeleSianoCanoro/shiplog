@@ -1,8 +1,11 @@
 import type { Sealed } from "../crypto";
 
+export type InstallProvider = "origin" | "github";
 export type InstallStatus = "active" | "suspended" | "disconnected";
 export interface Installation {
   id: string; namespace: string; status: InstallStatus; createdAt: string; disconnectedAt?: string | null;
+  /** Ingress provider for this installation (dual Origin + GitHub installs are separate records). */
+  provider?: InstallProvider;
   installerId?: string | null; namespaceType?: "user" | "team" | null;
   /** Per-repo backfill marker (ISO timestamp or skipped:reason:time). */
   historyBackfillAt?: Record<string, string>;
