@@ -79,6 +79,25 @@ describe("batch option", () => {
   });
 });
 
+describe("monorepo packages", () => {
+  it("defaults to empty packages and orphan root", () => {
+    expect(DEFAULT_CONFIG.packages).toEqual([]);
+    expect(DEFAULT_CONFIG.orphan).toBe("root");
+  });
+
+  it("parses packages and orphan ignore", () => {
+    const c = parseConfig(`
+packages:
+  web:
+    paths: [packages/web/**]
+    changelog: packages/web/CHANGELOG.md
+orphan: ignore
+`);
+    expect(c.packages[0]).toMatchObject({ name: "web", changelogPath: "packages/web/CHANGELOG.md" });
+    expect(c.orphan).toBe("ignore");
+  });
+});
+
 describe("notify.webhooks", () => {
   it("reads webhook URLs from config", () => {
     const c = parseConfig("notify:\n  webhooks:\n    - https://hooks.slack.com/services/A/B/C\n    - https://example.com/h\n");

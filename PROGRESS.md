@@ -60,6 +60,12 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - Item 5. Pre-1.0 versions get plain semver bumps (0.x to 1.0.0 on breaking). No special 0.x rule.
 - Item 4. Queued PRs wait forever if `batch: release` is set and no release is ever cut, or if the key is removed. A dashboard flush button or expiry would close this.
 - Item 4. Run cost in money is not shown, only the run count.
+
+- 2026-10-15. Item 13. No Neon AI Gateway credentials on the build box, so implement, test and review were done directly by the agent.
+- 2026-10-15. Item 13. Monorepo routing uses Origin List Pull Request Files (`GET /v1/origin/repos/{owner}/{repo}/pulls/{number}/files`, scope `repository:pull_requests:read`, already in the install scope list). Without Origin credentials (local, tests) package routing falls back to the root `changelog` path only.
+- 2026-10-15. Item 13. Optional `packages` in `.shiplog.yml` maps a name to path globs and a changelog file. `orphan: root` (default) sends unmatched files to the root changelog; `orphan: ignore` drops PRs that touch only unmatched paths.
+- 2026-10-15. Item 13. One merged PR can update several changelogs. Agent and prompt modes use a single run with a multi-file prompt. Batch daily flush groups queued PRs by changelog path. Release bump notes and neon cuts iterate every configured changelog.
+- 2026-10-15. Item 13. Neon test mode stores each changelog under `repo::path` when the path is not the default `CHANGELOG.md`, so single-changelog repos keep the existing storage key.
 - Item 1. Move `docs/ci/ci.yml` to `.github/workflows/ci.yml` (needs a token with `workflow` scope, for example `gh auth refresh -s workflow`).
 
 - Item 6. Public page does not yet pull `CHANGELOG.md` from Origin for cursor or prompt mode installs. Luigi or a follow-up can add optional `.shiplog.yml` `public: true` plus Origin file fetch.

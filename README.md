@@ -41,6 +41,14 @@ history:             # initial CHANGELOG backfill on install (merged PRs + semve
   enabled: true
   max_prs: 100
   max_tags: 50
+packages:            # optional monorepo: one changelog per package (roadmap item 13)
+  web:
+    paths: [packages/web/**]
+    changelog: packages/web/CHANGELOG.md
+  api:
+    paths: [packages/api/**]
+    changelog: packages/api/CHANGELOG.md
+orphan: root         # when packages is set: root = unmatched files use `changelog`; ignore = skip them
 ```
 
 When `notes.audiences` is set, Shiplog also drafts **technical** and **customer-facing** release notes in each listed language. In test mode (Neon) they are stored under a repo key like `owner/repo::notes::1.2.0` and posted on the release comment. With a Cursor key, the release agent is asked to write `.shiplog/notes/<version>/<audience>.<lang>.md` files alongside the changelog.
@@ -48,6 +56,8 @@ When `notes.audiences` is set, Shiplog also drafts **technical** and **customer-
 Installation-wide webhooks can also be set on `/setup` (same session as the Cursor key). Shiplog POSTs on changelog entries and releases; failures are logged only.
 
 On first install (and on the first webhook per repo), Shiplog can seed `CHANGELOG.md` from merged pull requests and existing semver tags when the file is still empty. Re-runs are skipped unless you call `POST /api/history/backfill` from an authenticated setup session with `{ "installationId", "repo?", "force": true }`.
+
+When `packages` is set, Shiplog loads the merged PR's changed files from the Origin API (`GET .../pulls/{number}/files`, scope `repository:pull_requests:read`, already requested) and drafts an entry in every matching package changelog. `/shiplog` commands, labels and classification apply to all targeted changelogs for that PR. Release comments include a semver suggestion per changelog file.
 
 ## PR commands
 
@@ -78,7 +88,7 @@ After deploy, connect a **private** Vercel Blob store, set `SHIPLOG_INSTALL_ORIG
 ## Origin App settings
 - Webhook URL: `https://<deploy>/api/webhooks/origin`. Callback / redirect URL: `https://<deploy>/api/install/callback`
 - Events: `pull_request.merged`, `pull_request.comment.created`, `repository.pushed` (installation.* are always sent)
-- Scopes: PR read + `repository:pull_requests:reviews:write` (comments). Only if Shiplog writes PRs itself: `repository:pull_requests:write`, `repository:contents:write`.
+- Scopes: PR read (includes listing changed files for monorepo routing) + `repository:pull_requests:reviews:write` (comments). Only if Shiplog writes PRs itself: `repository:pull_requests:write`, `repository:contents:write`.
 
 ## Develop
 ```bash

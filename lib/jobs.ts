@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { env } from "./env";
 import { getStore, type Job, type JobMode } from "./store";
-import { addEntry, batchPrompt, BREAKING_MARK, bumpNote, changelogPrompt, isBreaking, cutRelease, parsePrCommand, parseReleaseCommand, type PrCommand, releasePrompt, tagsFromPush, unreleased, type PrInfo, type QueuedEntry } from "./changelog";
+import { addEntry, batchPrompt, BREAKING_MARK, bumpNote, changelogPrompt, isBreaking, cutRelease, multiChangelogPrompt, multiReleasePrompt, neonChangelogKey, parsePrCommand, parseReleaseCommand, type PrCommand, releasePrompt, tagsFromPush, unreleased, type PrInfo, type QueuedEntry } from "./changelog";
 import { draftAudienceNote, draftEntry, draftSummary } from "./llm";
 import { getRun, launchAgent } from "./cursor";
 import { open, parseMasterKey } from "./crypto";
-import { commentOnPr, getInstallationInfo, getRepoFile, listPrComments, originConfigured, repoPermission } from "./origin";
+import { commentOnPr, getInstallationInfo, getRepoFile, listPrComments, listPrFiles, originConfigured, repoPermission } from "./origin";
 import { CONFIG_PATH, DEFAULT_CONFIG, excludedBy, notesEnabled, parseConfig, sectionFor, type ShiplogConfig } from "./config";
+import { allChangelogPaths, changelogTargets } from "./packages";
 import { mergeNotifyWebhooks, notifyWebhooks, type NotifyPayload } from "./notify";
 import { formatAudienceNotesBlock, notesStorageKey, releaseNotesInstructions, type AudienceNotes } from "./notes";
 import { backfillInstallation, maybeBackfillOnFirstVisit } from "./backfill";
@@ -96,7 +97,7 @@ async function latestPrCommand(installationId: string, repo: string, prNumber: s
   return null;
 }
 
-/** Suggested semver bump for a release, from the stored changelog (neon) or the repo's changelog file (agent and prompt). */
+/** Extra agent instructions for audience release notes. */
 function releaseNoteExtras(cfg: ShiplogConfig, version: string): string | undefined {
   if (!notesEnabled(cfg)) return undefined;
   return releaseNotesInstructions(version, cfg.notes.audiences, cfg.notes.languages);
@@ -113,13 +114,65 @@ async function draftStoredAudienceNotes(cfg: ShiplogConfig, version: string, unr
   return bundle;
 }
 
-/** Suggested semver bump for a release, from the stored changelog (neon) or the repo's changelog file (agent and prompt). */
-async function releaseBumpNote(installationId: string, repo: string, version: string, mode: JobMode, path: string): Promise<string | null> {
-  if (mode === "neon") return bumpNote(await getStore().getChangelog(repo), version);
-  if (!originConfigured()) return null;
-  const md = await getRepoFile(installationId, repo, path).catch(() => null);
-  return bumpNote(md, version);
+const styleOf = (cfg: ShiplogConfig, changelogPath: string) => ({ changelogPath, language: cfg.language, tone: cfg.tone });
+
+/** Changed file paths for a merged PR (Origin List Pull Request Files). Falls back to [] without Origin. */
+async function mergedPrFiles(installationId: string, repo: string, prNumber: string): Promise<string[]> {
+  if (!originConfigured() || !prNumber) return [];
+  try { return await listPrFiles(installationId, repo, prNumber); }
+  catch (e) { console.error("[shiplog] pr files failed:", (e as Error).message); return []; }
 }
+
+/** Which changelog files a merged PR should update. */
+async function targetsForPr(installationId: string, repo: string, prNumber: string, cfg: ShiplogConfig): Promise<string[]> {
+  if (!cfg.packages.length) return [cfg.changelogPath];
+  const files = await mergedPrFiles(installationId, repo, prNumber);
+  if (!files.length) return [cfg.changelogPath];
+  return changelogTargets(files, cfg);
+}
+
+function changelogEntryPrompt(info: PrInfo, hint: ReturnType<typeof sectionFor>, cfg: ShiplogConfig, paths: string[], entry?: string) {
+  if (paths.length === 1) return changelogPrompt(info, hint, styleOf(cfg, paths[0]), entry);
+  return multiChangelogPrompt(info, hint, styleOf(cfg, paths[0]), paths, entry);
+}
+
+/** Suggested semver bumps for a release (one line per changelog when monorepo packages are set). */
+async function releaseBumpNotes(installationId: string, repo: string, version: string, mode: JobMode, cfg: ShiplogConfig): Promise<string | null> {
+  const paths = allChangelogPaths(cfg);
+  const lines: string[] = [];
+  const store = getStore();
+  for (const path of paths) {
+    let note: string | null;
+    if (mode === "neon") note = bumpNote(await store.getChangelog(neonChangelogKey(repo, path)), version);
+    else if (!originConfigured()) continue;
+    else note = bumpNote(await getRepoFile(installationId, repo, path).catch(() => null), version);
+    if (note) lines.push(cfg.packages.length > 1 ? `**${path}** — ${note}` : note);
+  }
+  return lines.length ? lines.join("\n\n") : null;
+}
+
+function releaseAgentPrompt(repo: string, version: string, cfg: ShiplogConfig, extra?: string) {
+  const paths = allChangelogPaths(cfg);
+  const style = styleOf(cfg, paths[0]);
+  if (paths.length === 1) return releasePrompt(repo, version, today(), style, extra);
+  const p = multiReleasePrompt(repo, version, today(), style, paths);
+  return extra ? `${p}\n${extra}\nYou may also create the audience note files listed above.` : p;
+}
+
+/** Queued PRs at release time: one batch section per changelog file. */
+function batchReleasePrompt(repo: string, queued: Job[], cfg: ShiplogConfig, version: string, extra?: string) {
+  const byPath = new Map<string, QueuedEntry[]>();
+  for (const j of queued) {
+    const e = entryOf(j);
+    const paths = e.changelogPaths?.length ? e.changelogPaths : [cfg.changelogPath];
+    for (const path of paths) byPath.set(path, [...(byPath.get(path) ?? []), e]);
+  }
+  const date = today();
+  const parts = [...byPath.entries()].map(([path, entries]) => batchPrompt(repo, entries, styleOf(cfg, path), { version, date }, extra, path));
+  return parts.length === 1 ? parts[0] : parts.join("\n\n---\n\n");
+}
+
+const pathsLabel = (paths: string[]) => (paths.length === 1 ? `\`${paths[0]}\`` : `${paths.length} changelog files (\`${paths.join("`, `")}\`)`);
 
 // pull_request.comment.created carries the repo only under pullRequest.repository.
 const repoOf = (p: any): string => {
@@ -202,61 +255,83 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
   const skip = kind !== "changelog" ? null : cmd?.kind === "skip" ? "/shiplog skip" : excludedBy(pr, cfg);
   const entry = cmd?.kind === "entry" ? cmd.text : undefined;
   if (skip) { job.status = "ignored"; job.result = `excluded by ${skip}`; await store.putJob(job); return job; }
+  const changelogPaths = kind === "changelog" ? await targetsForPr(instId, repo, prNumber, cfg) : undefined;
+  if (kind === "changelog" && cfg.packages.length && !changelogPaths!.length) {
+    job.status = "ignored"; job.result = "no matching package paths"; await store.putJob(job); return job;
+  }
+  if (changelogPaths?.length) job.changelogPaths = changelogPaths;
   await store.putJob(job);
 
   try {
     if (kind === "changelog") {
+      const paths = changelogPaths!;
       const hint = sectionFor(info.title, cfg);
       if (mode === "neon") {
         const drafted = entry ? { section: hint ?? "Changed", bullet: `${entry} (#${prNumber})` } : await draftEntry(info, hint, undefined, cfg);
         const { section } = drafted;
         const bullet = isBreaking(info.title, info.body) ? BREAKING_MARK + drafted.bullet : drafted.bullet;
-        const md = addEntry(await store.getChangelog(repo), section, bullet);
-        await store.putChangelog(repo, md);
-        job.result = `### ${section}\n- ${bullet}`;
+        const blocks: string[] = [];
+        for (const path of paths) {
+          const key = neonChangelogKey(repo, path);
+          const md = addEntry(await store.getChangelog(key), section, bullet);
+          await store.putChangelog(key, md);
+          blocks.push(`<!-- ${path} -->\n### ${section}\n- ${bullet}`);
+        }
+        job.result = blocks.join("\n\n");
         await postComment(instId, repo, prNumber, `**Shiplog** drafted a changelog entry for this PR:\n\n\`\`\`md\n## [Unreleased]\n\n${job.result}\n\`\`\`\n\n<sub>Test mode (direct model draft). Comment \`/shiplog release vX.Y.Z\` to cut release notes.</sub>`);
         fireUserNotify(instId, cfg, { event: "changelog_entry", repo, prNumber, prUrl: info.url, title: info.title, detail: job.result });
       } else if (mode === "cursor" && cfg.batch !== "off") {
-        const q: QueuedEntry & { batch: string } = { number: prNumber, url: info.url, title: info.title, body: info.body.slice(0, 1000), section: hint, entry, breaking: isBreaking(info.title, info.body), batch: cfg.batch };
+        const q: QueuedEntry & { batch: string } = { number: prNumber, url: info.url, title: info.title, body: info.body.slice(0, 1000), section: hint, entry, breaking: isBreaking(info.title, info.body), changelogPaths: paths, batch: cfg.batch };
         job.status = "queued"; job.result = JSON.stringify(q);
         await postComment(instId, repo, prNumber, `**Shiplog** queued this PR for the next ${cfg.batch === "daily" ? "daily" : "release"} batch. One agent run will cover every queued PR.`);
       } else if (mode === "cursor") {
-        const l = await launchAgent(key!, changelogPrompt(info, hint, cfg, entry), repoUrl(repo));
+        const prompt = changelogEntryPrompt(info, hint, cfg, paths, entry);
+        const l = await launchAgent(key!, prompt, repoUrl(repo));
         job.agentId = l.agentId; job.runId = l.runId; job.result = `agent ${l.agentId}`;
-        await postComment(instId, repo, prNumber, `**Shiplog** is drafting the changelog entry with a Cursor cloud agent on your plan. A PR updating \`${cfg.changelogPath}\` will follow.`);
+        await postComment(instId, repo, prNumber, `**Shiplog** is drafting the changelog entry with a Cursor cloud agent on your plan. A PR updating ${pathsLabel(paths)} will follow.`);
       } else {
-        job.result = changelogPrompt(info, hint, cfg, entry);
+        job.result = changelogEntryPrompt(info, hint, cfg, paths, entry);
         await postComment(instId, repo, prNumber, fallbackComment(info, job.result));
       }
     } else {
       const v = version!;
-      const note = await releaseBumpNote(instId, repo, v, mode, cfg.changelogPath);
+      const note = await releaseBumpNotes(instId, repo, v, mode, cfg);
       const withNote = (body: string) => (note ? `${body}\n\n${note}` : body);
+      const releasePaths = allChangelogPaths(cfg);
       if (mode === "neon") {
-        const before = await store.getChangelog(repo);
-        const notes = unreleased(before);
-        const summary = notes ? await draftSummary(v, notes) : "Maintenance release.";
-        const md = cutRelease(before, v, today(), summary);
-        await store.putChangelog(repo, md);
-        job.result = `## [${v.replace(/^v/, "")}] - ${today()}\n\n${summary}\n\n${notes}`;
+        const blocks: string[] = [];
+        const allNotes: string[] = [];
+        for (const path of releasePaths) {
+          const key = neonChangelogKey(repo, path);
+          const before = await store.getChangelog(key);
+          const notes = unreleased(before);
+          if (!notes) continue;
+          allNotes.push(notes);
+          const summary = await draftSummary(v, notes);
+          const md = cutRelease(before, v, today(), summary);
+          await store.putChangelog(key, md);
+          blocks.push(`<!-- ${path} -->\n## [${v.replace(/^v/, "")}] - ${today()}\n\n${summary}\n\n${notes}`);
+        }
         let audienceBlock = "";
-        if (notesEnabled(cfg) && notes) {
-          const bundle = await draftStoredAudienceNotes(cfg, v, notes);
+        if (notesEnabled(cfg) && allNotes.length) {
+          const bundle = await draftStoredAudienceNotes(cfg, v, allNotes.join("\n\n"));
           await store.putChangelog(notesStorageKey(repo, v), JSON.stringify(bundle, null, 2));
           audienceBlock = `\n\n${formatAudienceNotesBlock(v, bundle)}`;
         }
+        job.result = blocks.length ? blocks.join("\n\n\n") : `no unreleased content`;
         await postComment(instId, repo, prNumber, withNote(`**Shiplog** release notes for **${v}**:\n\n\`\`\`md\n${job.result}\n\`\`\`${audienceBlock}`));
         fireUserNotify(instId, cfg, { event: "release_cut", repo, prNumber, prUrl: info.url, version: v, detail: job.result });
       } else if (mode === "cursor") {
         const queued = await queuedFor(instId, repo);
         const extra = releaseNoteExtras(cfg, v);
-        const prompt = queued.length ? batchPrompt(repo, queued.map(entryOf), cfg, { version: v, date: today() }, extra) : releasePrompt(repo, v, today(), cfg, extra);
+        const prompt = queued.length ? batchReleasePrompt(repo, queued, cfg, v, extra) : releaseAgentPrompt(repo, v, cfg, extra);
         const l = await launchAgent(key!, prompt, repoUrl(repo));
-        job.agentId = l.agentId; job.runId = l.runId; job.result = `agent ${l.agentId}${queued.length ? ` (${queued.length} queued PRs)` : ""}`;
+        job.agentId = l.agentId; job.runId = l.runId; job.changelogPaths = releasePaths;
+        job.result = `agent ${l.agentId}${queued.length ? ` (${queued.length} queued PRs)` : ""}`;
         await markBatched(queued, job.id);
         await postComment(instId, repo, prNumber, withNote(`**Shiplog** is cutting **${v}** with a Cursor cloud agent. A release PR will follow.`));
       } else {
-        job.result = releasePrompt(repo, v, today(), cfg, releaseNoteExtras(cfg, v));
+        job.result = releaseAgentPrompt(repo, v, cfg, releaseNoteExtras(cfg, v));
         await postComment(instId, repo, prNumber, withNote(fallbackComment(info, job.result, v)));
       }
     }
@@ -279,23 +354,30 @@ async function markBatched(queued: Job[], batchJobId: string) {
   for (const j of queued) { j.status = "done"; j.result = `batched into ${batchJobId}`; await getStore().putJob(j); }
 }
 
-/** Daily batches (cron): one agent per repo for every PR queued with `batch: daily`. Returns agents launched. */
+/** Daily batches (cron): one agent per repo and changelog file for PRs queued with `batch: daily`. Returns agents launched. */
 export async function flushBatches(): Promise<number> {
   const store = getStore();
-  const groups = new Map<string, Job[]>();
+  const groups = new Map<string, { installationId: string; repo: string; path: string; jobs: Job[] }>();
   for (const j of (await store.listJobs()).filter((j) => j.status === "queued" && batchOf(j) === "daily").reverse()) {
-    const k = `${j.installationId} ${j.repo}`;
-    groups.set(k, [...(groups.get(k) ?? []), j]);
+    const e = entryOf(j);
+    const paths = e.changelogPaths?.length ? e.changelogPaths : ["__default__"];
+    for (const path of paths) {
+      const k = `${j.installationId}\t${j.repo}\t${path}`;
+      const g = groups.get(k);
+      if (g) g.jobs.push(j);
+      else groups.set(k, { installationId: j.installationId, repo: j.repo, path, jobs: [j] });
+    }
   }
   let launched = 0;
-  for (const queued of groups.values()) {
-    const { installationId, repo } = queued[0];
+  for (const { installationId, repo, path, jobs: queued } of groups.values()) {
     try {
       const key = await userKey(installationId);
       if (!key) continue;
       const cfg = await loadConfig(installationId, repo);
-      const l = await launchAgent(key, batchPrompt(repo, queued.map(entryOf), cfg), repoUrl(repo));
-      const job: Job = { id: randomUUID(), deliveryId: `batch-${randomUUID()}`, installationId, repo, prNumber: "", prUrl: repoUrl(repo), kind: "changelog", mode: "cursor", status: "running", agentId: l.agentId, runId: l.runId, result: `agent ${l.agentId} (${queued.length} queued PRs)`, createdAt: new Date().toISOString() };
+      const changelogPath = path === "__default__" ? cfg.changelogPath : path;
+      const entries = queued.map(entryOf);
+      const l = await launchAgent(key, batchPrompt(repo, entries, styleOf(cfg, changelogPath), undefined, undefined, changelogPath), repoUrl(repo));
+      const job: Job = { id: randomUUID(), deliveryId: `batch-${randomUUID()}`, installationId, repo, prNumber: "", prUrl: repoUrl(repo), kind: "changelog", mode: "cursor", status: "running", agentId: l.agentId, runId: l.runId, changelogPaths: [changelogPath], result: `agent ${l.agentId} (${entries.length} queued PRs)`, createdAt: new Date().toISOString() };
       await store.putJob(job);
       await markBatched(queued, job.id);
       launched++;
@@ -341,7 +423,8 @@ export async function pollAgents(): Promise<number> {
         job.result = run.prUrl ? `PR ${run.prUrl}` : `agent ${run.status}`;
         await store.putJob(job); updated++;
         if (run.prUrl) {
-          await postComment(job.installationId, job.repo, job.prNumber, `**Shiplog** opened ${run.prUrl} updating \`CHANGELOG.md\`.`);
+          const paths = job.changelogPaths?.length ? job.changelogPaths : ["CHANGELOG.md"];
+          await postComment(job.installationId, job.repo, job.prNumber, `**Shiplog** opened ${run.prUrl} updating ${pathsLabel(paths)}.`);
           const cfg = await loadConfig(job.installationId, job.repo);
           const detail = job.kind === "release" ? `Release PR: ${run.prUrl}` : `Changelog PR: ${run.prUrl}`;
           const payload: NotifyPayload = job.kind === "release"

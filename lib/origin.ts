@@ -60,6 +60,26 @@ export async function getRepoFile(installationId: string, repo: string, path: st
   return j.type === "file" && j.content ? Buffer.from(j.content, "base64").toString("utf8") : null;
 }
 
+/** Changed paths in a PR (needs repository:pull_requests:read). Capped at 500 files. */
+export async function listPrFiles(installationId: string, repo: string, prNumber: string): Promise<string[]> {
+  const [owner, name] = repo.split("/");
+  const token = await installationToken(installationId);
+  const out: string[] = [];
+  let page = "";
+  for (let i = 0; i < 5; i++) {
+    const q = `pageSize=100${page ? `&pageToken=${encodeURIComponent(page)}` : ""}`;
+    const r = await fetch(`${env.originApi}/repos/${owner}/${name}/pulls/${prNumber}/files?${q}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+    if (!r.ok) throw new Error(`pr files ${r.status}`);
+    const j = (await r.json()) as { files?: { filename?: string }[]; nextPageToken?: string };
+    for (const file of j.files ?? []) {
+      if (file.filename) out.push(file.filename);
+    }
+    if (!j.nextPageToken) break;
+    page = j.nextPageToken;
+  }
+  return out;
+}
+
 export interface PrComment { body: string; author: any }
 /** Every comment on a PR, oldest first (needs repository:pull_requests:reviews:read). Capped at 500. */
 export async function listPrComments(installationId: string, repo: string, prNumber: string): Promise<PrComment[]> {
