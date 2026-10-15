@@ -21,11 +21,16 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR pe
 - 2026-10-15. Item 3. `no-changelog` is always honored, even when `.shiplog.yml` overrides `exclude.labels`.
 - 2026-10-15. Item 3. In Neon test mode an entry override is written directly, with no model call. Agent and prompt modes pass it to the agent verbatim inside an `<entry>` tag.
 - 2026-10-15. Item 3. Fixed author matching from item 2 to read Origin's real fields (`user.handle`, `app.displayName`, `serviceAccount.displayName`) per the List Pull Request Comments schema.
+- 2026-10-15. Item 5. Breaking is detected from the PR title (`type!:` or `type(scope)!:`) or a `BREAKING CHANGE:` footer in the body, per Conventional Commits. A loose mention of "breaking change" in prose does not count.
+- 2026-10-15. Item 5. Breaking entries are marked in the changelog with a `**BREAKING:**` prefix. That keeps the signal in the file itself, so the release suggestion needs no extra stored state and works for agent-written changelogs too.
+- 2026-10-15. Item 5. Bump rule follows semver with Keep a Changelog sections. Breaking or Removed gives major, Added or Deprecated gives minor, everything else patch. The suggestion is advisory. Shiplog still cuts the version the user asked for and flags a mismatch.
+- 2026-10-15. Item 5. For agent and prompt modes the suggestion reads the repo's changelog file through Origin. Without Origin credentials there is no suggestion.
 
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
 - Item 3. Without Origin credentials (local runs) commands are not read at merge time. Only labels apply there.
+- Item 5. Pre-1.0 versions get plain semver bumps (0.x to 1.0.0 on breaking). No special 0.x rule.
 - Item 1. Move `docs/ci/ci.yml` to `.github/workflows/ci.yml` (needs a token with `workflow` scope, for example `gh auth refresh -s workflow`).
 
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).

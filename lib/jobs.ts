@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { env } from "./env";
 import { getStore, type Job, type JobMode } from "./store";
-import { addEntry, changelogPrompt, cutRelease, parsePrCommand, parseReleaseCommand, type PrCommand, releasePrompt, tagsFromPush, unreleased, type PrInfo } from "./changelog";
+import { addEntry, BREAKING_MARK, bumpNote, changelogPrompt, isBreaking, cutRelease, parsePrCommand, parseReleaseCommand, type PrCommand, releasePrompt, tagsFromPush, unreleased, type PrInfo } from "./changelog";
 import { draftEntry, draftSummary } from "./llm";
 import { getRun, launchAgent } from "./cursor";
 import { open, parseMasterKey } from "./crypto";
@@ -81,6 +81,14 @@ async function latestPrCommand(installationId: string, repo: string, prNumber: s
     if (cmd && (await canRelease(installationId, repo, c.author))) return cmd;
   }
   return null;
+}
+
+/** Suggested semver bump for a release, from the stored changelog (neon) or the repo's changelog file (agent and prompt). */
+async function releaseBumpNote(installationId: string, repo: string, version: string, mode: JobMode, path: string): Promise<string | null> {
+  if (mode === "neon") return bumpNote(await getStore().getChangelog(repo), version);
+  if (!originConfigured()) return null;
+  const md = await getRepoFile(installationId, repo, path).catch(() => null);
+  return bumpNote(md, version);
 }
 
 // pull_request.comment.created carries the repo only under pullRequest.repository.
@@ -166,7 +174,9 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
     if (kind === "changelog") {
       const hint = sectionFor(info.title, cfg);
       if (mode === "neon") {
-        const { section, bullet } = entry ? { section: hint ?? "Changed", bullet: `${entry} (#${prNumber})` } : await draftEntry(info, hint, undefined, cfg);
+        const drafted = entry ? { section: hint ?? "Changed", bullet: `${entry} (#${prNumber})` } : await draftEntry(info, hint, undefined, cfg);
+        const { section } = drafted;
+        const bullet = isBreaking(info.title, info.body) ? BREAKING_MARK + drafted.bullet : drafted.bullet;
         const md = addEntry(await store.getChangelog(repo), section, bullet);
         await store.putChangelog(repo, md);
         job.result = `### ${section}\n- ${bullet}`;
@@ -181,6 +191,8 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
       }
     } else {
       const v = version!;
+      const note = await releaseBumpNote(instId, repo, v, mode, cfg.changelogPath);
+      const withNote = (body: string) => (note ? `${body}\n\n${note}` : body);
       if (mode === "neon") {
         const before = await store.getChangelog(repo);
         const notes = unreleased(before);
@@ -188,14 +200,14 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
         const md = cutRelease(before, v, today(), summary);
         await store.putChangelog(repo, md);
         job.result = `## [${v.replace(/^v/, "")}] - ${today()}\n\n${summary}\n\n${notes}`;
-        await postComment(instId, repo, prNumber, `**Shiplog** release notes for **${v}**:\n\n\`\`\`md\n${job.result}\n\`\`\``);
+        await postComment(instId, repo, prNumber, withNote(`**Shiplog** release notes for **${v}**:\n\n\`\`\`md\n${job.result}\n\`\`\``));
       } else if (mode === "cursor") {
         const l = await launchAgent(key!, releasePrompt(repo, v, today(), cfg), repoUrl(repo));
         job.agentId = l.agentId; job.runId = l.runId; job.result = `agent ${l.agentId}`;
-        await postComment(instId, repo, prNumber, `**Shiplog** is cutting **${v}** with a Cursor cloud agent. A release PR will follow.`);
+        await postComment(instId, repo, prNumber, withNote(`**Shiplog** is cutting **${v}** with a Cursor cloud agent. A release PR will follow.`));
       } else {
         job.result = releasePrompt(repo, v, today(), cfg);
-        await postComment(instId, repo, prNumber, fallbackComment(info, job.result, v));
+        await postComment(instId, repo, prNumber, withNote(fallbackComment(info, job.result, v)));
       }
     }
     job.status = mode === "cursor" ? "running" : "done";
