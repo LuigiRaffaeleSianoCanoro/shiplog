@@ -29,9 +29,9 @@ Status key: **Done** shipped on `feat/mvp`. **Next** is the near-term focus afte
 
 - **Origin marketplace publish** — record the public demo video and complete Cursor Origin app review (see [README.md](README.md#publishing-not-done-yet)). Needs the maintainer; tracked in PROGRESS.md.
 
-## Later
+12. **GitHub App for GitHub-native and GitHub-mirrored repos** — direction locked in [docs/adr/0012-github-app.md](docs/adr/0012-github-app.md); **not built yet**. Separate GitHub App on the same Vercel deploy (`/api/webhooks/github`), shared changelog core behind a provider adapter, `provider=origin` or `provider=github` install records, dual install allowed. v1 events: merged PR, `/shiplog` via PR or issue comments, tag push when available. BYOK or prompt-first on GitHub-only repos; Cursor agent mode only when Cursor can reach the repo.
 
-12. **GitHub App for GitHub-mirrored repos** — needs direction on scope, hosting, and how it relates to the Origin App
+## Later
 
 15. **In-app changelog widget** — embed or surface changelogs inside other products; not scoped yet
 
