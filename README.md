@@ -49,7 +49,14 @@ packages:            # optional monorepo: one changelog per package (roadmap ite
     paths: [packages/api/**]
     changelog: packages/api/CHANGELOG.md
 orphan: root         # when packages is set: root = unmatched files use `changelog`; ignore = skip them
+powered_by: true     # show "Changelog by Shiplog" on the public page at /{namespace}/{repo} (default on; set false to hide)
 ```
+
+Public changelog pages show a small **Changelog by Shiplog** badge by default. Disable it per repo with `powered_by: false` in `.shiplog.yml`.
+
+## Sponsors
+
+Shiplog is open source. GitHub Sponsors for the maintainer: [github.com/sponsors/LuigiRaffaeleSianoCanoro](https://github.com/sponsors/LuigiRaffaeleSianoCanoro). The repo includes [`.github/FUNDING.yml`](.github/FUNDING.yml) so GitHub can surface the sponsor link.
 
 When `notes.audiences` is set, Shiplog also drafts **technical** and **customer-facing** release notes in each listed language. In test mode (Neon) they are stored under a repo key like `owner/repo::notes::1.2.0` and posted on the release comment. With a Cursor key, the release agent is asked to write `.shiplog/notes/<version>/<audience>.<lang>.md` files alongside the changelog.
 

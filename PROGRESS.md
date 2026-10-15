@@ -72,6 +72,11 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - 2026-10-15. Item 14. MCP is a stateless Streamable HTTP handler at `/api/mcp` using `@modelcontextprotocol/sdk` (`WebStandardStreamableHTTPServerTransport`), exposing read-only tools `get_changelog`, `get_release`, and `list_packages` backed by the same lib helpers as the REST routes. No API keys or new Origin scopes; public visibility only.
 - 2026-10-15. Item 14. Verified locally on `npm start` with `SHIPLOG_DATA_FILE`: `GET /api/v1/changelogs/acme/demo` and `GET …/releases/1.0.0` returned 200 JSON; `POST /api/mcp` with `Accept: application/json, text/event-stream` returned `initialize` over SSE.
 
+- 2026-10-15. Item 5.4 (monetization readiness 1–2). Added `.github/FUNDING.yml` with GitHub Sponsors only (`LuigiRaffaeleSianoCanoro`). No Ko-fi, Buy Me a Coffee, or other third-party funding URLs.
+- 2026-10-15. Item 5.4. Public changelog badge copy is **Changelog by Shiplog**, on by default. Opt out with `powered_by: false` in `.shiplog.yml` (camelCase `poweredBy` accepted). Config is loaded through the shared `loadRepoConfig` helper (same Origin contents read as other options).
+- 2026-10-15. Item 5.4. Dashboard and setup link to `https://github.com/sponsors/LuigiRaffaeleSianoCanoro` via `lib/sponsors.ts` (**Support Shiplog**). No invented payment URLs.
+- 2026-10-15. Item 5.4. No Neon AI Gateway on the build box; `npm test` and `npm run build` were run directly on the agent VM (same pattern as prior items).
+
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).

@@ -18,6 +18,8 @@ nav a.btn { color: #fff; }
 .panel { background: var(--panel); border:1px solid var(--line); border-radius: 16px; padding: 24px; margin: 16px 0; box-shadow: 0 2px 0 var(--line), 0 12px 30px -18px rgba(19,35,90,.35); }
 .panel.navy { background: var(--navy); border-color: var(--navy); color: #fff; }
 .muted { color: var(--muted); }
+a.support-link { color: var(--navy); font-weight: 600; text-decoration: underline; text-decoration-color: #b8d42e; text-underline-offset: 3px; }
+a.support-link:hover { color: var(--red); text-decoration-color: var(--red); }
 .btn { display:inline-block; border:2px solid var(--navy); background:#fff; color:var(--navy); padding: 11px 20px; border-radius: 10px; font-weight:700; cursor:pointer; font-size:.95rem; text-decoration:none; font-family: inherit; transition: transform .15s ease, box-shadow .15s ease; }
 .btn:hover { transform: translateY(-1px); }
 .btn.primary { background: var(--red); color:#fff; border-color: var(--red); box-shadow: 0 4px 0 var(--red-dark); }

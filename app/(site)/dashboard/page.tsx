@@ -4,6 +4,7 @@ import { agentRunStats, pollAgents } from "@/lib/jobs";
 import { cookies } from "next/headers";
 import { COOKIE, readSession } from "@/lib/session";
 import { safeEqual } from "@/lib/crypto";
+import { GITHUB_SPONSORS_URL } from "@/lib/sponsors";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     <main className="wrap page" style={{ maxWidth: 1040 }}>
       <h1 className="fade-up">Dash<span className="accent">board</span></h1>
       <p className="muted">Mode: <span className="pill gray">{env.llmProvider === "neon" ? "test · direct model" : "cursor agents"}</span></p>
+      <p className="muted fade-up d1" style={{ marginTop: -8 }}>
+        <a href={GITHUB_SPONSORS_URL} className="support-link">Support Shiplog</a>
+        <span className="muted"> · open source on GitHub Sponsors</span>
+      </p>
       <div className="panel fade-up d1">
         <h3>Installations</h3>
         <div className="table-scroll"><table><thead><tr><th>Installation</th><th>Namespace</th><th>Status</th><th>Key</th><th>Agent runs</th></tr></thead><tbody>
