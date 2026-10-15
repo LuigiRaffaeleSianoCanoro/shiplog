@@ -364,6 +364,56 @@ describe("llm content shapes", () => {
   });
 });
 
+describe("audience notes on release", () => {
+  it("neon mode drafts technical and customer notes in en and es", async () => {
+    const { store, jobs } = await setup({
+      SHIPLOG_LLM_PROVIDER: "neon",
+      NEON_AI_GATEWAY_BASE_URL: "https://gw.test",
+      NEON_AI_GATEWAY_TOKEN: "t",
+      ORIGIN_APP_ID: "app_1",
+      ORIGIN_APP_PRIVATE_KEY: generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+    });
+    const yml = "notes:\n  audiences: [technical, customer]\n  languages: [en, es]\n";
+    const f = vi.fn(async (url: string, init?: any) => {
+      const u = String(url);
+      if (u.includes("/access_tokens")) return new Response(JSON.stringify({ token: "tok" }));
+      if (u.includes("/contents")) return new Response(JSON.stringify({ type: "file", content: Buffer.from(yml).toString("base64") }));
+      if (u.includes("gw.test")) {
+        const body = JSON.parse(init?.body ?? "{}");
+        const user = body.messages?.[1]?.content ?? "";
+        if (user.includes("audience=technical") && user.includes("language=en")) return new Response(JSON.stringify({ choices: [{ message: { content: "Technical EN body." } }] }));
+        if (user.includes("audience=technical") && user.includes("language=es")) return new Response(JSON.stringify({ choices: [{ message: { content: "Cuerpo técnico ES." } }] }));
+        if (user.includes("audience=customer") && user.includes("language=en")) return new Response(JSON.stringify({ choices: [{ message: { content: "Customer EN body." } }] }));
+        if (user.includes("audience=customer") && user.includes("language=es")) return new Response(JSON.stringify({ choices: [{ message: { content: "Cuerpo cliente ES." } }] }));
+        if (user.includes(". Changes:")) return new Response(JSON.stringify({ choices: [{ message: { content: "Release summary." } }] }));
+        return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }));
+      }
+      return new Response("{}");
+    });
+    vi.stubGlobal("fetch", f);
+    await store.putChangelog("luigi/demo", "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- Dark mode (#8)\n");
+    await store.upsertInstallation({ id: "i_1", namespace: "luigi", status: "active", createdAt: "", installerId: "user_owner" });
+    await jobs.handleEvent({
+      installationId: "i_1",
+      event: {
+        type: "pull_request.comment.created",
+        payload: {
+          pullRequest: { number: "8", repository: { name: "demo", owner: { slug: "luigi" } } },
+          comment: { body: "/shiplog release v1.0.0", author: { user: { id: "user_owner" } } },
+        },
+      },
+    }, "an1");
+    const stored = await store.getChangelog("luigi/demo::notes::1.0.0");
+    expect(stored).toContain("Technical EN body.");
+    expect(stored).toContain("Cuerpo cliente ES.");
+    const rel = (await store.listOutbox()).find((o) => o.body.includes("Audience notes"))!;
+    expect(rel.body).toContain("Technical (en)");
+    expect(rel.body).toContain("Customer (es)");
+    expect(rel.body).not.toContain("|");
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("ping", () => {
   it("ignores Origin ping deliveries (no installation)", async () => {
     vi.resetModules();

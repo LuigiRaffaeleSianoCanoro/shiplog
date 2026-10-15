@@ -34,4 +34,12 @@ export class MemoryStore implements Store {
   listOutbox(id?: string) { return this.tx((d) => d.outbox.filter((o) => !id || o.installationId === id)); }
   getChangelog(repo: string) { return this.tx((d) => d.changelogs[repo] ?? null); }
   putChangelog(repo: string, md: string) { return this.tx((d) => { d.changelogs[repo] = md; }); }
+  getNotifyWebhooks(id: string) { return this.tx((d) => d.installations[id]?.notifyWebhooks ?? []); }
+  putNotifyWebhooks(id: string, webhooks: string[]) {
+    return this.tx((d) => {
+      const prev = d.installations[id];
+      if (!prev) throw new Error("unknown installation");
+      d.installations[id] = { ...prev, notifyWebhooks: webhooks };
+    });
+  }
 }
