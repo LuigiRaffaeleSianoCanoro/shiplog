@@ -1,6 +1,6 @@
 # Progress and decision log
 
-Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 10). One small PR per item against `feat/mvp`.
+Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against `feat/mvp`.
 
 ## Decisions
 
@@ -30,6 +30,28 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 10). One small PR p
 - 2026-10-15. Item 4. `batch: release` folds every queued PR into the release agent run, so a release costs one run total. `batch: daily` flushes from the existing daily Vercel cron (`/api/cron/poll`), one agent per repo. The dashboard view does not flush, so opening it never spends money.
 - 2026-10-15. Item 4. Batching applies only to Cursor agent mode. Prompt and Neon modes cost the key owner nothing, so they stay per PR.
 - 2026-10-15. Item 4. The dashboard shows agent runs per installation (last 30 days and total) and which key pays (personal or service account). Runs are counted from jobs with an agent id. Exact credit cost is not available from the Cursor API used here.
+- 2026-10-15. Item 6. Public changelog lives at `/{namespace}/{repo}` with `feed.xml` (RSS) and `feed.json`. Harbor styling is scoped to that route group so the marketing site stays unchanged.
+- 2026-10-15. Item 6. Pages read markdown from the existing store (`getChangelog`). Agent mode still edits `CHANGELOG.md` in the repo, so the public page reflects neon test mode and any release cuts that write to the store until a future sync from Origin is added.
+- 2026-10-15. Item 6. Only active installations with a matching `namespace` can be viewed. Disconnected installs return 404. Slug segments are restricted to safe characters.
+
+- 2026-10-15. Item 7. Outbound notify webhooks are optional HTTPS URLs the user provides (Slack incoming webhook, Discord webhook, or generic JSON POST). Shiplog POSTs from the server with `fetch`; Luigi pays no email or messaging vendor.
+- 2026-10-15. Item 7. URLs are stored per installation on the setup page (`/api/notify`, session-gated like keys) and/or per repo in `.shiplog.yml` as `notify.webhooks`. Blob and memory stores keep them on the installation record; Supabase stores installation URLs in the existing changelogs table under `@notify:<installationId>` so no migration is needed.
+- 2026-10-15. Item 7. Events: changelog entry written (neon test mode immediately; Cursor mode when the agent PR is detected) and release cut (neon immediately; Cursor when the release PR is detected). Queued batch PRs notify only when the batch agent finishes. Prompt-only fallback does not notify (no changelog file write).
+- 2026-10-15. Item 7. Delivery failures are logged with query strings redacted and never fail the job. Invalid URLs are skipped at save time and at send time.
+- 2026-10-15. Item 7. No Neon AI Gateway credentials on the cloud agent VM; implementation and tests were done directly by the agent (same pattern as items 1–6).
+
+- 2026-10-15. Item 8. No Neon AI Gateway from the Cloud Agent VM, so implement, test and review were done directly by the agent (same constraint as the global note above).
+- 2026-10-15. Item 8. Audience notes are opt-in via `.shiplog.yml` `notes.audiences` (`technical`, `customer`) and `notes.languages` (`en`, `es` only). Default is off so existing repos behave the same.
+- 2026-10-15. Item 8. Notes are generated on **release** (tag or `/shiplog release`), not on every merged PR, to avoid extra model or agent cost.
+- 2026-10-15. Item 8. Neon test mode stores JSON bundles with `putChangelog` under `owner/repo::notes::X.Y.Z` (reuses the changelog blob table, no Supabase migration). Agent mode writes `.shiplog/notes/<version>/<audience>.<lang>.md` per the release prompt.
+- 2026-10-15. Item 8. User-facing PR comments use `#### Technical (en)` headings and never the pipe character in generated copy.
+- 2026-10-15. Item 9. No Neon AI Gateway credentials on the build box, so implement, test and review were done directly by the agent (same as items 1 to 8).
+- 2026-10-15. Item 9. Initial changelog backfill runs on `installation.created` (all installation repos) and lazily on the first repo webhook when a repo was not covered yet. Idempotency uses `historyBackfillAt` on the installation record plus a check that the repo changelog file is still empty.
+- 2026-10-15. Item 9. History is built deterministically from merged PR titles (Keep a Changelog sections, exclude labels) and semver tags (tag commit time when Origin returns it). It commits through `git/commits:createFromFiles` when Origin is configured; neon test mode also mirrors into stored changelog.
+- 2026-10-15. Item 9. `.shiplog.yml` accepts `history.enabled`, `history.max_prs` and `history.max_tags` (snake_case aliases). Default helps first-time installs without extra config.
+- 2026-10-15. Item 10. Self-host guide lives at `docs/self-host.md` with README Deploy-to-Vercel button (clone URL on `feat/mvp`, env names prefilled, `envLink` to the guide). `.env.example` lists every variable read under `lib/` and `app/`. `test/env-docs.test.ts` enforces that list.
+- 2026-10-15. Item 10. Default recommendation for self-hosters is keyless mode (`SHIPLOG_BYOK_ENABLED=false`) for US$0 LLM spend; BYOK remains the production default for the maintainer deploy.
+- 2026-10-15. Item 10. No Neon AI Gateway on the build box; `npm test` and `npm run build` were run on the agent VM only. The first `next build` failed on a transient `next/font` Google fetch error; a immediate retry succeeded.
 
 ## Left to do
 
@@ -40,9 +62,8 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 10). One small PR p
 - Item 4. Run cost in money is not shown, only the run count.
 - Item 1. Move `docs/ci/ci.yml` to `.github/workflows/ci.yml` (needs a token with `workflow` scope, for example `gh auth refresh -s workflow`).
 
-- 2026-10-15. Item 10. Self-host guide lives at `docs/self-host.md` with README Deploy-to-Vercel button (clone URL on `feat/mvp`, env names prefilled, `envLink` to the guide). `.env.example` lists every variable read under `lib/` and `app/`. `test/env-docs.test.ts` enforces that list.
-- 2026-10-15. Item 10. Default recommendation for self-hosters is keyless mode (`SHIPLOG_BYOK_ENABLED=false`) for US$0 LLM spend; BYOK remains the production default for the maintainer deploy.
-- 2026-10-15. Item 10. No Neon AI Gateway on the build box; `npm test` and `npm run build` were run on the agent VM only. The first `next build` failed on a transient `next/font` Google fetch error; a immediate retry succeeded.
-
+- Item 6. Public page does not yet pull `CHANGELOG.md` from Origin for cursor or prompt mode installs. Luigi or a follow-up can add optional `.shiplog.yml` `public: true` plus Origin file fetch.
+- Item 8. Per-PR audience snippets (before release) and languages beyond en/es are not implemented.
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
 - Item 1. Enable secret scanning, push protection, Dependabot and private vulnerability reporting in GitHub settings. Add CODEOWNERS and issue templates.
+- Item 7. Email notifications are out of scope (webhook-only per roadmap). Retry/backoff for failed webhooks is not implemented.

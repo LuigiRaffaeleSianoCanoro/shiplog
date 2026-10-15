@@ -50,4 +50,10 @@ export class BlobStore implements Store {
   async listOutbox(id?: string) { return readAll<Outbox>(id ? `${P}/outbox/${enc(id)}/` : `${P}/outbox/`, 50); }
   async getChangelog(repo: string) { return (await readJson<{ markdown: string }>(`${P}/changelogs/${enc(repo)}.json`))?.markdown ?? null; }
   async putChangelog(repo: string, md: string) { await write(`${P}/changelogs/${enc(repo)}.json`, { markdown: md, updatedAt: new Date().toISOString() }); }
+  async getNotifyWebhooks(id: string) { return (await this.getInstallation(id))?.notifyWebhooks ?? []; }
+  async putNotifyWebhooks(id: string, webhooks: string[]) {
+    const prev = await this.getInstallation(id);
+    if (!prev) throw new Error("unknown installation");
+    await this.upsertInstallation({ ...prev, notifyWebhooks: webhooks });
+  }
 }
