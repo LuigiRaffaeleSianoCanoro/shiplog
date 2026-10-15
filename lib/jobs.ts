@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { env } from "./env";
 import { getStore, type Job, type JobMode } from "./store";
-import { addEntry, BREAKING_MARK, bumpNote, changelogPrompt, isBreaking, cutRelease, parsePrCommand, parseReleaseCommand, type PrCommand, releasePrompt, tagsFromPush, unreleased, type PrInfo } from "./changelog";
+import { addEntry, batchPrompt, BREAKING_MARK, bumpNote, changelogPrompt, isBreaking, cutRelease, parsePrCommand, parseReleaseCommand, type PrCommand, releasePrompt, tagsFromPush, unreleased, type PrInfo, type QueuedEntry } from "./changelog";
 import { draftEntry, draftSummary } from "./llm";
 import { getRun, launchAgent } from "./cursor";
 import { open, parseMasterKey } from "./crypto";
@@ -181,6 +181,10 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
         await store.putChangelog(repo, md);
         job.result = `### ${section}\n- ${bullet}`;
         await postComment(instId, repo, prNumber, `**Shiplog** drafted a changelog entry for this PR:\n\n\`\`\`md\n## [Unreleased]\n\n${job.result}\n\`\`\`\n\n<sub>Test mode (direct model draft). Comment \`/shiplog release vX.Y.Z\` to cut release notes.</sub>`);
+      } else if (mode === "cursor" && cfg.batch !== "off") {
+        const q: QueuedEntry & { batch: string } = { number: prNumber, url: info.url, title: info.title, body: info.body.slice(0, 1000), section: hint, entry, breaking: isBreaking(info.title, info.body), batch: cfg.batch };
+        job.status = "queued"; job.result = JSON.stringify(q);
+        await postComment(instId, repo, prNumber, `**Shiplog** queued this PR for the next ${cfg.batch === "daily" ? "daily" : "release"} batch. One agent run will cover every queued PR.`);
       } else if (mode === "cursor") {
         const l = await launchAgent(key!, changelogPrompt(info, hint, cfg, entry), repoUrl(repo));
         job.agentId = l.agentId; job.runId = l.runId; job.result = `agent ${l.agentId}`;
@@ -202,21 +206,66 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
         job.result = `## [${v.replace(/^v/, "")}] - ${today()}\n\n${summary}\n\n${notes}`;
         await postComment(instId, repo, prNumber, withNote(`**Shiplog** release notes for **${v}**:\n\n\`\`\`md\n${job.result}\n\`\`\``));
       } else if (mode === "cursor") {
-        const l = await launchAgent(key!, releasePrompt(repo, v, today(), cfg), repoUrl(repo));
-        job.agentId = l.agentId; job.runId = l.runId; job.result = `agent ${l.agentId}`;
+        const queued = await queuedFor(instId, repo);
+        const prompt = queued.length ? batchPrompt(repo, queued.map(entryOf), cfg, { version: v, date: today() }) : releasePrompt(repo, v, today(), cfg);
+        const l = await launchAgent(key!, prompt, repoUrl(repo));
+        job.agentId = l.agentId; job.runId = l.runId; job.result = `agent ${l.agentId}${queued.length ? ` (${queued.length} queued PRs)` : ""}`;
+        await markBatched(queued, job.id);
         await postComment(instId, repo, prNumber, withNote(`**Shiplog** is cutting **${v}** with a Cursor cloud agent. A release PR will follow.`));
       } else {
         job.result = releasePrompt(repo, v, today(), cfg);
         await postComment(instId, repo, prNumber, withNote(fallbackComment(info, job.result, v)));
       }
     }
-    job.status = mode === "cursor" ? "running" : "done";
+    if (job.status !== "queued") job.status = mode === "cursor" ? "running" : "done";
   } catch (e) {
     job.status = "failed";
     job.result = (e as Error).message;
   }
   await store.putJob(job);
   return job;
+}
+
+const entryOf = (j: Job): QueuedEntry => JSON.parse(j.result ?? "{}");
+const batchOf = (j: Job): string => { try { return JSON.parse(j.result ?? "{}").batch ?? ""; } catch { return ""; } };
+
+async function queuedFor(installationId: string, repo: string): Promise<Job[]> {
+  return (await getStore().listJobs(installationId)).filter((j) => j.status === "queued" && j.repo === repo).reverse();
+}
+async function markBatched(queued: Job[], batchJobId: string) {
+  for (const j of queued) { j.status = "done"; j.result = `batched into ${batchJobId}`; await getStore().putJob(j); }
+}
+
+/** Daily batches (cron): one agent per repo for every PR queued with `batch: daily`. Returns agents launched. */
+export async function flushBatches(): Promise<number> {
+  const store = getStore();
+  const groups = new Map<string, Job[]>();
+  for (const j of (await store.listJobs()).filter((j) => j.status === "queued" && batchOf(j) === "daily").reverse()) {
+    const k = `${j.installationId} ${j.repo}`;
+    groups.set(k, [...(groups.get(k) ?? []), j]);
+  }
+  let launched = 0;
+  for (const queued of groups.values()) {
+    const { installationId, repo } = queued[0];
+    try {
+      const key = await userKey(installationId);
+      if (!key) continue;
+      const cfg = await loadConfig(installationId, repo);
+      const l = await launchAgent(key, batchPrompt(repo, queued.map(entryOf), cfg), repoUrl(repo));
+      const job: Job = { id: randomUUID(), deliveryId: `batch-${randomUUID()}`, installationId, repo, prNumber: "", prUrl: repoUrl(repo), kind: "changelog", mode: "cursor", status: "running", agentId: l.agentId, runId: l.runId, result: `agent ${l.agentId} (${queued.length} queued PRs)`, createdAt: new Date().toISOString() };
+      await store.putJob(job);
+      await markBatched(queued, job.id);
+      launched++;
+    } catch (e) { console.error("[shiplog] batch flush failed:", (e as Error).message); }
+  }
+  return launched;
+}
+
+/** Cursor agent runs billed to the installation's key. */
+export function agentRunStats(jobs: Job[], now: Date): { last30Days: number; total: number } {
+  const runs = jobs.filter((j) => j.mode === "cursor" && j.agentId);
+  const since = now.getTime() - 30 * 24 * 3600 * 1000;
+  return { last30Days: runs.filter((j) => Date.parse(j.createdAt) >= since).length, total: runs.length };
 }
 
 export function fallbackComment(info: PrInfo, prompt: string, version?: string) {

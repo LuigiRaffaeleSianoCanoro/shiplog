@@ -237,6 +237,71 @@ describe("breaking changes in jobs", () => {
   });
 });
 
+describe("batch mode", () => {
+  const pem = generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  const env_ = { ORIGIN_APP_ID: "app_1", ORIGIN_APP_PRIVATE_KEY: pem };
+  const fake = (yml: string) => vi.fn(async (url: string, init?: any) => {
+    const u = String(url);
+    if (u.includes("/access_tokens")) return new Response(JSON.stringify({ token: "tok" }));
+    if (u.includes("/contents")) return new Response(JSON.stringify({ type: "file", content: Buffer.from(yml).toString("base64") }));
+    if (u.includes("/comments") && init?.method !== "POST") return new Response(JSON.stringify({ comments: [] }));
+    if (u.endsWith("/v1/agents")) return new Response(JSON.stringify({ agent: { id: "bc-batch" }, run: { id: "run-b" } }));
+    return new Response("{}");
+  });
+  const launches = (f: any) => f.mock.calls.filter((c: any) => String(c[0]).endsWith("/v1/agents"));
+  async function withKey(store: any) {
+    const { seal, parseMasterKey } = await import("@/lib/crypto");
+    await store.upsertInstallation({ id: "i_1", namespace: "luigi", status: "active", createdAt: "", installerId: "u" });
+    await store.putKey({ ...seal("key_abcdefghijklmnop", parseMasterKey(master), "i_1"), installationId: "i_1", last4: "mnop", createdAt: "" });
+  }
+  const release = (v: string) => ({ installationId: "i_1", event: { type: "pull_request.comment.created", payload: { pullRequest: { number: "42", repository: { name: "demo", owner: { slug: "luigi" } } }, comment: { body: `/shiplog release ${v}`, author: { user: { id: "u" } } } } } });
+
+  it("batch: release queues merges and launches one agent at release time", async () => {
+    const { store, jobs } = await setup(env_); await withKey(store);
+    const f = fake("batch: release"); vi.stubGlobal("fetch", f);
+    expect((await jobs.handleEvent(merged("40", "feat: a"), "q1"))?.status).toBe("queued");
+    expect((await jobs.handleEvent(merged("41", "fix: b"), "q2"))?.status).toBe("queued");
+    expect(launches(f)).toHaveLength(0);
+    const rel = await jobs.handleEvent(release("v1.1.0"), "q3");
+    expect(launches(f)).toHaveLength(1);
+    const prompt = JSON.parse(launches(f)[0][1].body).prompt.text as string;
+    expect(prompt).toContain(`number="40"`); expect(prompt).toContain(`number="41"`); expect(prompt).toContain("1.1.0");
+    expect(rel?.agentId).toBe("bc-batch");
+    expect((await store.listJobs()).filter((j: any) => j.status === "queued")).toHaveLength(0);
+    vi.unstubAllGlobals();
+  });
+
+  it("batch: daily is flushed by the cron with one agent per repo", async () => {
+    const { store, jobs } = await setup(env_); await withKey(store);
+    const f = fake("batch: daily"); vi.stubGlobal("fetch", f);
+    await jobs.handleEvent(merged("50", "feat: a"), "r1");
+    await jobs.handleEvent(merged("51", "feat: b"), "r2");
+    expect(launches(f)).toHaveLength(0);
+    expect(await jobs.flushBatches()).toBe(1);
+    expect(launches(f)).toHaveLength(1);
+    expect(await jobs.flushBatches()).toBe(0);
+    vi.unstubAllGlobals();
+  });
+
+  it("without a key, batch config still posts the per-PR prompt (nothing to bill)", async () => {
+    const { jobs } = await setup(env_);
+    vi.stubGlobal("fetch", fake("batch: daily"));
+    expect((await jobs.handleEvent(merged("52", "feat: a"), "r3"))?.mode).toBe("fallback");
+    vi.unstubAllGlobals();
+  });
+
+  it("counts agent runs per installation", async () => {
+    const { store, jobs } = await setup({});
+    const base = { deliveryId: "d", installationId: "i_1", repo: "luigi/demo", prNumber: "", prUrl: "", kind: "changelog" as const, status: "done" as const };
+    const now = new Date().toISOString();
+    await store.putJob({ ...base, id: "a", mode: "cursor", agentId: "bc-1", createdAt: now });
+    await store.putJob({ ...base, id: "b", mode: "cursor", agentId: "bc-2", createdAt: now });
+    await store.putJob({ ...base, id: "c", mode: "fallback", createdAt: now });
+    await store.putJob({ ...base, id: "d", mode: "cursor", agentId: "bc-0", createdAt: "2020-01-01T00:00:00Z" });
+    expect(jobs.agentRunStats(await store.listJobs("i_1"), new Date())).toEqual({ last30Days: 2, total: 3 });
+  });
+});
+
 describe("llm content shapes", () => {
   it("accepts array-of-blocks content", async () => {
     vi.resetModules();
