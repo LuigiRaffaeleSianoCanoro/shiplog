@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Big_Shoulders, Manrope } from "next/font/google";
+import { Manrope, Oswald } from "next/font/google";
 import "./globals.css";
 
-const display = Big_Shoulders({ subsets: ["latin"], weight: ["900"], variable: "--font-display" });
+const display = Oswald({ subsets: ["latin"], weight: ["700"], variable: "--font-display" });
 const manrope = Manrope({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-manrope" });
 
 export const metadata: Metadata = {
