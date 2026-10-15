@@ -1,6 +1,6 @@
 # Progress and decision log
 
-Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR per item against `feat/mvp`.
+Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 10). One small PR per item against `feat/mvp`.
 
 ## Decisions
 
@@ -39,6 +39,10 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR pe
 - Item 4. Queued PRs wait forever if `batch: release` is set and no release is ever cut, or if the key is removed. A dashboard flush button or expiry would close this.
 - Item 4. Run cost in money is not shown, only the run count.
 - Item 1. Move `docs/ci/ci.yml` to `.github/workflows/ci.yml` (needs a token with `workflow` scope, for example `gh auth refresh -s workflow`).
+
+- 2026-10-15. Item 10. Self-host guide lives at `docs/self-host.md` with README Deploy-to-Vercel button (clone URL on `feat/mvp`, env names prefilled, `envLink` to the guide). `.env.example` lists every variable read under `lib/` and `app/`. `test/env-docs.test.ts` enforces that list.
+- 2026-10-15. Item 10. Default recommendation for self-hosters is keyless mode (`SHIPLOG_BYOK_ENABLED=false`) for US$0 LLM spend; BYOK remains the production default for the maintainer deploy.
+- 2026-10-15. Item 10. No Neon AI Gateway on the build box; `npm test` and `npm run build` were run on the agent VM only. The first `next build` failed on a transient `next/font` Google fetch error; a immediate retry succeeded.
 
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
 - Item 1. Enable secret scanning, push protection, Dependabot and private vulnerability reporting in GitHub settings. Add CODEOWNERS and issue templates.

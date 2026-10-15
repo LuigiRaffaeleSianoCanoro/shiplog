@@ -51,6 +51,14 @@ The `no-changelog` label always skips a PR, as does any label in `exclude.labels
 - Prompt injection: PR text is fenced as untrusted, and the agent is told to edit only `CHANGELOG.md`.
 - Supabase: RLS on with no policies, so only the server-side service role can access the data.
 
+## Self-host
+
+Run your own private instance on Vercel Hobby (personal, non-commercial). Full steps, Origin app settings, and every environment variable are in **[docs/self-host.md](docs/self-host.md)**.
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FLuigiRaffaeleSianoCanoro%2Fshiplog%2Ftree%2Ffeat%2Fmvp&project-name=shiplog&repository-name=shiplog&env=ORIGIN_APP_ID&env=ORIGIN_APP_PRIVATE_KEY&env=SHIPLOG_KEY_ENC&env=CRON_SECRET&env=SHIPLOG_INSTALL_ORIGIN&env=SHIPLOG_LLM_PROVIDER&env=SHIPLOG_BYOK_ENABLED&envLink=https%3A%2F%2Fgithub.com%2FLuigiRaffaeleSianoCanoro%2Fshiplog%2Fblob%2Ffeat%2Fmvp%2Fdocs%2Fself-host.md)
+
+After deploy, connect a **private** Vercel Blob store, set `SHIPLOG_INSTALL_ORIGIN` to your production URL, and create your own Origin App with the same events and scopes as below. For **zero LLM cost**, set `SHIPLOG_BYOK_ENABLED=false` (keyless prompt mode).
+
 ## Origin App settings
 - Webhook URL: `https://<deploy>/api/webhooks/origin`. Callback / redirect URL: `https://<deploy>/api/install/callback`
 - Events: `pull_request.merged`, `pull_request.comment.created`, `repository.pushed` (installation.* are always sent)
