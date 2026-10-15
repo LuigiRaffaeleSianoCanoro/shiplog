@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@vercel/blob": "^2.8.1",
     "next": "^15.5.27",
     "react": "^19.3.0",

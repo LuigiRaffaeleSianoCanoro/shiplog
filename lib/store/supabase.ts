@@ -52,6 +52,14 @@ export class SupabaseStore implements Store {
   async putChangelog(repo: string, md: string) {
     await this.q("shiplog_changelogs?on_conflict=repo", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal", body: JSON.stringify({ repo, markdown: md, updated_at: new Date().toISOString() }) });
   }
+  async listChangelogKeysForRepo(repoSlug: string) {
+    const exact = await this.rows<{ repo: string }>(`shiplog_changelogs?repo=eq.${encodeURIComponent(repoSlug)}&select=repo`);
+    const prefixed = await this.rows<{ repo: string }>(
+      `shiplog_changelogs?repo=like.${encodeURIComponent(`${repoSlug}::`)}%&select=repo`,
+    );
+    const keys = [...exact, ...prefixed].map((r) => r.repo);
+    return [...new Set(keys)].sort();
+  }
   private static CRON_LOCK = "__cron_poll_lock__";
   async acquireCronPollLock(ttlMs: number) {
     const rows = await this.rows<{ received_at: string }>(`shiplog_deliveries?id=eq.${SupabaseStore.CRON_LOCK}`);

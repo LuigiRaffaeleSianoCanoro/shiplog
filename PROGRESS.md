@@ -66,6 +66,11 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - 2026-10-15. Item 1 (CI activation). First CI run failed on gitleaks: a PEM-shaped fixture in `test/backfill.test.ts` (two commits in history). Replaced it with a plain placeholder and added `.gitleaks.toml` allowlist for `test/` so runtime-generated test keys do not fail the scan.
 - 2026-10-15. Item 1 (CI activation). GitHub Actions `next build` failed on `next/font` for `Big Shoulders` (missing override metadata). Root layout now uses `Oswald` (already used on public changelog pages) so CI builds do not depend on that font catalog entry.
 
+- 2026-10-15. Item 14. No Neon AI Gateway on the build box; implement, test and self-review were done directly by the agent (same as items 1 to 13).
+- 2026-10-15. Item 14. Read-only HTTP API lives under `/api/v1/changelogs/…` with `apiVersion: v1`, reusing `parseChangelogDocument` and the same active-installation plus slug rules as `resolvePublicChangelog`. Monorepo paths use the `changelog` query param and the existing `repo::path` storage keys (`listChangelogKeysForRepo` on the store; notes and `@notify` keys are excluded from package listings).
+- 2026-10-15. Item 14. MCP is a stateless Streamable HTTP handler at `/api/mcp` using `@modelcontextprotocol/sdk` (`WebStandardStreamableHTTPServerTransport`), exposing read-only tools `get_changelog`, `get_release`, and `list_packages` backed by the same lib helpers as the REST routes. No API keys or new Origin scopes; public visibility only.
+- 2026-10-15. Item 14. Verified locally on `npm start` with `SHIPLOG_DATA_FILE`: `GET /api/v1/changelogs/acme/demo` and `GET …/releases/1.0.0` returned 200 JSON; `POST /api/mcp` with `Accept: application/json, text/event-stream` returned `initialize` over SSE.
+
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
@@ -84,3 +89,4 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
 - Item 1. Enable secret scanning, push protection, Dependabot and private vulnerability reporting in GitHub settings. Add CODEOWNERS and issue templates.
 - Item 7. Email notifications are out of scope (webhook-only per roadmap). Retry/backoff for failed webhooks is not implemented.
+- Item 14. MCP has no OAuth or per-repo URL tokens (public read only). Optional API rate limiting and OpenAPI export are not implemented.

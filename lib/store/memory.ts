@@ -37,6 +37,11 @@ export class MemoryStore implements Store {
   listOutbox(id?: string) { return this.tx((d) => d.outbox.filter((o) => !id || o.installationId === id)); }
   getChangelog(repo: string) { return this.tx((d) => d.changelogs[repo] ?? null); }
   putChangelog(repo: string, md: string) { return this.tx((d) => { d.changelogs[repo] = md; }); }
+  listChangelogKeysForRepo(repoSlug: string) {
+    return this.tx((d) =>
+      Object.keys(d.changelogs).filter((k) => k === repoSlug || k.startsWith(`${repoSlug}::`)),
+    );
+  }
   async acquireCronPollLock(ttlMs: number) {
     const now = Date.now();
     if (this.cronPollLock && this.cronPollLock.expiresAt > now) return false;

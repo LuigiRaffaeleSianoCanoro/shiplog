@@ -76,6 +76,10 @@ For **Neon test mode** only (`SHIPLOG_LLM_PROVIDER=neon`):
 
 - `SHIPLOG_DATA_FILE` — path for JSON file storage when not on Vercel and Blob is not configured (default `.data/shiplog.json`).
 
+## Changelog read API and MCP
+
+After deploy, public changelog JSON is available at `/api/v1/changelogs/{namespace}/{repo}` (same visibility rules as `/{namespace}/{repo}`). Monorepo paths use `?changelog=…`. A read-only MCP server is at `/api/mcp` with tools `get_changelog`, `get_release`, and `list_packages`. See the [README](../README.md#read-only-changelog-api-and-mcp-roadmap-item-14) for curl examples and how to add the MCP URL in Cursor.
+
 ### Set by the platform (do not copy into `.env.local` for Vercel)
 
 - `BLOB_READ_WRITE_TOKEN`, `BLOB_STORE_ID` — injected when a Blob store is linked to the project.
