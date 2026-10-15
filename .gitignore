@@ -5,3 +5,4 @@ node_modules
 .data
 *.pem
 next-env.d.ts
+*.tsbuildinfo
