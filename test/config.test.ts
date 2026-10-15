@@ -70,3 +70,11 @@ describe("batch option", () => {
     expect(DEFAULT_CONFIG.batch).toBe("off");
   });
 });
+
+describe("notify.webhooks", () => {
+  it("reads webhook URLs from config", () => {
+    const c = parseConfig("notify:\n  webhooks:\n    - https://hooks.slack.com/services/A/B/C\n    - https://example.com/h\n");
+    expect(c.notify.webhooks).toEqual(["https://hooks.slack.com/services/A/B/C", "https://example.com/h"]);
+    expect(parseConfig(null).notify.webhooks).toEqual([]);
+  });
+});

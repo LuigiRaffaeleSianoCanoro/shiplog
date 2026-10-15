@@ -34,9 +34,14 @@ batch: off           # "release": one agent per release; "daily": one agent per 
 notes:
   audiences: [technical, customer]   # omit or leave empty to disable
   languages: [en, es]                # defaults to en and es when audiences are set
+notify:
+  webhooks:          # optional HTTPS URLs (Slack, Discord, or generic JSON POST)
+    - https://hooks.slack.com/services/…
 ```
 
 When `notes.audiences` is set, Shiplog also drafts **technical** and **customer-facing** release notes in each listed language. In test mode (Neon) they are stored under a repo key like `owner/repo::notes::1.2.0` and posted on the release comment. With a Cursor key, the release agent is asked to write `.shiplog/notes/<version>/<audience>.<lang>.md` files alongside the changelog.
+
+Installation-wide webhooks can also be set on `/setup` (same session as the Cursor key). Shiplog POSTs on changelog entries and releases; failures are logged only.
 
 ## PR commands
 

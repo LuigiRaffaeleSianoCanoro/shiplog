@@ -16,6 +16,8 @@ export interface ShiplogConfig {
   batch: BatchMode;
   /** Optional per-audience release notes (technical and customer) with en/es output. */
   notes: { audiences: NoteAudience[]; languages: NoteLanguage[] };
+  /** Optional outbound webhook URLs (Slack incoming, Discord, or generic HTTPS POST). */
+  notify: { webhooks: string[] };
 }
 export type BatchMode = "off" | "release" | "daily";
 
@@ -24,6 +26,7 @@ export const DEFAULT_CONFIG: ShiplogConfig = {
   sections: {}, exclude: { labels: ["skip-changelog"], authors: [] },
   language: "en", tone: "concise, user-facing", changelogPath: "CHANGELOG.md", mode: "agent", batch: "off",
   notes: { audiences: [], languages: ["en", "es"] },
+  notify: { webhooks: [] },
 };
 
 const str = (v: unknown, max = 80) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
@@ -51,6 +54,7 @@ export function parseConfig(text: string | null): ShiplogConfig {
       audiences: parseNoteAudiences(raw.notes?.audiences),
       languages: parseNoteLanguages(raw.notes?.languages),
     },
+    notify: { webhooks: strList(raw.notify?.webhooks) ?? [] },
   };
 }
 
