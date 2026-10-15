@@ -31,7 +31,7 @@ describe("history backfill", () => {
   it("writes changelog via Origin when configured", async () => {
     await freshStore();
     process.env.ORIGIN_APP_ID = "app_test";
-    process.env.ORIGIN_APP_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIL8+example\n-----END PRIVATE KEY-----";
+    process.env.ORIGIN_APP_PRIVATE_KEY = "secret-key-material";
     vi.resetModules();
     await freshStore();
     const backfill = await import("@/lib/backfill");
