@@ -77,6 +77,8 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - 2026-10-15. Item 5.4. Dashboard and setup link to `https://github.com/sponsors/LuigiRaffaeleSianoCanoro` via `lib/sponsors.ts` (**Support Shiplog**). No invented payment URLs.
 - 2026-10-15. Item 5.4. No Neon AI Gateway on the build box; `npm test` and `npm run build` were run directly on the agent VM (same pattern as prior items).
 
+- 2026-10-15. OSS docs hygiene (strategy 4.1 and 4.7). Added [TRADEMARKS.md](TRADEMARKS.md) (names Shiplog, Harbor, sail mark, brand colors; Apache-2.0 does not grant trademark use) and [ROADMAP.md](ROADMAP.md) (items 1–11, 13, 14 and monetization badge or FUNDING marked done on `feat/mvp`; 12, 15, 16 later). Linked both from README Contributing. No Neon AI Gateway on the build box; `npm test` run on the agent VM only.
+
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
