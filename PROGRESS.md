@@ -1,6 +1,6 @@
 # Progress and decision log
 
-Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 7). One small PR per item against `feat/mvp`.
+Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against `feat/mvp`.
 
 ## Decisions
 
@@ -40,6 +40,12 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 7). One small PR pe
 - 2026-10-15. Item 7. Delivery failures are logged with query strings redacted and never fail the job. Invalid URLs are skipped at save time and at send time.
 - 2026-10-15. Item 7. No Neon AI Gateway credentials on the cloud agent VM; implementation and tests were done directly by the agent (same pattern as items 1–6).
 
+- 2026-10-15. Item 8. No Neon AI Gateway from the Cloud Agent VM, so implement, test and review were done directly by the agent (same constraint as the global note above).
+- 2026-10-15. Item 8. Audience notes are opt-in via `.shiplog.yml` `notes.audiences` (`technical`, `customer`) and `notes.languages` (`en`, `es` only). Default is off so existing repos behave the same.
+- 2026-10-15. Item 8. Notes are generated on **release** (tag or `/shiplog release`), not on every merged PR, to avoid extra model or agent cost.
+- 2026-10-15. Item 8. Neon test mode stores JSON bundles with `putChangelog` under `owner/repo::notes::X.Y.Z` (reuses the changelog blob table, no Supabase migration). Agent mode writes `.shiplog/notes/<version>/<audience>.<lang>.md` per the release prompt.
+- 2026-10-15. Item 8. User-facing PR comments use `#### Technical (en)` headings and never the pipe character in generated copy.
+
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
@@ -50,6 +56,7 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 7). One small PR pe
 - Item 1. Move `docs/ci/ci.yml` to `.github/workflows/ci.yml` (needs a token with `workflow` scope, for example `gh auth refresh -s workflow`).
 
 - Item 6. Public page does not yet pull `CHANGELOG.md` from Origin for cursor or prompt mode installs. Luigi or a follow-up can add optional `.shiplog.yml` `public: true` plus Origin file fetch.
+- Item 8. Per-PR audience snippets (before release) and languages beyond en/es are not implemented.
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
 - Item 1. Enable secret scanning, push protection, Dependabot and private vulnerability reporting in GitHub settings. Add CODEOWNERS and issue templates.
 - Item 7. Email notifications are out of scope (webhook-only per roadmap). Retry/backoff for failed webhooks is not implemented.

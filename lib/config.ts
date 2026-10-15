@@ -1,5 +1,6 @@
 import { parse } from "yaml";
 import { classify, SECTIONS, type Section } from "./changelog";
+import { parseNoteAudiences, parseNoteLanguages, type NoteAudience, type NoteLanguage } from "./notes";
 
 export type ConfigMode = "agent" | "prompt";
 export interface ShiplogConfig {
@@ -13,6 +14,8 @@ export interface ShiplogConfig {
   mode: ConfigMode;
   /** Agent cost control: "release" or "daily" queue merged PRs and launch one agent per batch. */
   batch: BatchMode;
+  /** Optional per-audience release notes (technical and customer) with en/es output. */
+  notes: { audiences: NoteAudience[]; languages: NoteLanguage[] };
   /** Optional outbound webhook URLs (Slack incoming, Discord, or generic HTTPS POST). */
   notify: { webhooks: string[] };
 }
@@ -22,6 +25,7 @@ export const CONFIG_PATH = ".shiplog.yml";
 export const DEFAULT_CONFIG: ShiplogConfig = {
   sections: {}, exclude: { labels: ["skip-changelog"], authors: [] },
   language: "en", tone: "concise, user-facing", changelogPath: "CHANGELOG.md", mode: "agent", batch: "off",
+  notes: { audiences: [], languages: ["en", "es"] },
   notify: { webhooks: [] },
 };
 
@@ -46,8 +50,16 @@ export function parseConfig(text: string | null): ShiplogConfig {
     changelogPath: safePath(raw.changelog) ?? DEFAULT_CONFIG.changelogPath,
     mode: raw.mode === "prompt" ? "prompt" : "agent",
     batch: raw.batch === "release" || raw.batch === "daily" ? raw.batch : "off",
+    notes: {
+      audiences: parseNoteAudiences(raw.notes?.audiences),
+      languages: parseNoteLanguages(raw.notes?.languages),
+    },
     notify: { webhooks: strList(raw.notify?.webhooks) ?? [] },
   };
+}
+
+export function notesEnabled(c: ShiplogConfig) {
+  return c.notes.audiences.length > 0;
 }
 
 export function sectionFor(title: string, c: ShiplogConfig): Section | null {
