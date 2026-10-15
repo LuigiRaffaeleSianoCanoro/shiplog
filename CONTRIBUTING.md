@@ -33,7 +33,7 @@ Sign every commit with `git commit -s`. This adds a `Signed-off-by` line that ce
 
 ## Code of conduct
 
-This project follows the [Contributor Covenant](https://www.contributor-covenant.org/version/2/1/code_of_conduct/). Be kind.
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md), version 2.1. Be kind.
 
 ## Good first issues
 

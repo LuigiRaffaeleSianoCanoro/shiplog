@@ -65,6 +65,7 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - 2026-10-15. Item 1 (CI activation). Push of `.github/workflows/ci.yml` and `.github/dependabot.yml` succeeded from the cloud agent token (PR #16). Unlike the earlier attempt, no `workflow` scope error was returned.
 - 2026-10-15. Item 1 (CI activation). First CI run failed on gitleaks: a PEM-shaped fixture in `test/backfill.test.ts` (two commits in history). Replaced it with a plain placeholder and added `.gitleaks.toml` allowlist for `test/` so runtime-generated test keys do not fail the scan.
 - 2026-10-15. Item 1 (CI activation). GitHub Actions `next build` failed on `next/font` for `Big Shoulders` (missing override metadata). Root layout now uses `Oswald` (already used on public changelog pages) so CI builds do not depend on that font catalog entry.
+- 2026-10-15. Item 1 (OSS templates). Added `.github/CODEOWNERS`, issue forms (bug and feature), `pull_request_template.md`, and `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1). Security and conduct reports use GitHub private vulnerability reporting per SECURITY.md. Secret scanning, push protection, Dependabot and private vulnerability reporting are enabled in repo settings.
 
 ## Left to do
 
@@ -82,5 +83,4 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - Item 6. Public page does not yet pull `CHANGELOG.md` from Origin for cursor or prompt mode installs. Luigi or a follow-up can add optional `.shiplog.yml` `public: true` plus Origin file fetch.
 - Item 8. Per-PR audience snippets (before release) and languages beyond en/es are not implemented.
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
-- Item 1. Enable secret scanning, push protection, Dependabot and private vulnerability reporting in GitHub settings. Add CODEOWNERS and issue templates.
 - Item 7. Email notifications are out of scope (webhook-only per roadmap). Retry/backoff for failed webhooks is not implemented.
