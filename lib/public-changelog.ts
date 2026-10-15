@@ -1,4 +1,5 @@
 import { EMPTY, SECTIONS, type Section } from "./changelog";
+import { loadRepoConfig } from "./repo-config";
 import type { Store } from "./store";
 
 const SEG = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
@@ -140,6 +141,8 @@ export interface ResolvedPublicChangelog {
   repoName: string;
   markdown: string;
   document: ChangelogDocument;
+  /** From `.shiplog.yml` `powered_by` (default true). */
+  showPoweredBy: boolean;
 }
 
 /** Active installation for namespace plus stored changelog markdown (defaults to EMPTY). */
@@ -150,12 +153,14 @@ export async function resolvePublicChangelog(namespace: string, repo: string, st
   const active = installs.find((i) => i.status === "active" && i.namespace === namespace);
   if (!active) return null;
   const markdown = (await store.getChangelog(repoSlug)) ?? EMPTY;
+  const cfg = await loadRepoConfig(active.id, repoSlug);
   return {
     repoSlug,
     namespace,
     repoName: repo,
     markdown,
     document: parseChangelogDocument(markdown),
+    showPoweredBy: cfg.poweredBy,
   };
 }
 

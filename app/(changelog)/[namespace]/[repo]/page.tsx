@@ -77,9 +77,11 @@ export default async function PublicChangelogPage({ params }: Props) {
             </article>
           ))
         )}
-        <Link href="/" className="ch-badge">
-          Powered by <strong>Shiplog</strong>
-        </Link>
+        {data.showPoweredBy ? (
+          <Link href="/" className="ch-badge">
+            Changelog by <strong>Shiplog</strong>
+          </Link>
+        ) : null}
       </main>
     </>
   );

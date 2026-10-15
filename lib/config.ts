@@ -25,6 +25,8 @@ export interface ShiplogConfig {
   notes: { audiences: NoteAudience[]; languages: NoteLanguage[] };
   /** Optional outbound webhook URLs (Slack incoming, Discord, or generic HTTPS POST). */
   notify: { webhooks: string[] };
+  /** Show the "Changelog by Shiplog" badge on the public changelog page (default on). */
+  poweredBy: boolean;
 }
 export type BatchMode = "off" | "release" | "daily";
 export interface HistoryConfig {
@@ -42,6 +44,7 @@ export const DEFAULT_CONFIG: ShiplogConfig = {
   history: DEFAULT_HISTORY,
   notes: { audiences: [], languages: ["en", "es"] },
   notify: { webhooks: [] },
+  poweredBy: true,
 };
 
 const str = (v: unknown, max = 80) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
@@ -99,6 +102,7 @@ export function parseConfig(text: string | null): ShiplogConfig {
       languages: parseNoteLanguages(raw.notes?.languages),
     },
     notify: { webhooks: strList(raw.notify?.webhooks) ?? [] },
+    poweredBy: raw.powered_by === false || raw.poweredBy === false ? false : DEFAULT_CONFIG.poweredBy,
   };
 }
 

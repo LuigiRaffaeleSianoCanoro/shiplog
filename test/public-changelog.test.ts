@@ -66,6 +66,7 @@ describe("resolvePublicChangelog", () => {
     const r = await resolvePublicChangelog("acme", "demo", store);
     expect(r?.repoSlug).toBe("acme/demo");
     expect(r?.markdown).toContain("Launch");
+    expect(r?.showPoweredBy).toBe(true);
   });
 
   it("404s disconnected installs and slug mismatches", async () => {

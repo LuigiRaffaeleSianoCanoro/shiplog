@@ -105,3 +105,14 @@ describe("notify.webhooks", () => {
     expect(parseConfig(null).notify.webhooks).toEqual([]);
   });
 });
+
+describe("powered_by badge", () => {
+  it("defaults on and can be turned off", () => {
+    expect(DEFAULT_CONFIG.poweredBy).toBe(true);
+    expect(parseConfig(null).poweredBy).toBe(true);
+    expect(parseConfig("powered_by: false").poweredBy).toBe(false);
+    expect(parseConfig("poweredBy: false").poweredBy).toBe(false);
+    expect(parseConfig("powered_by: true").poweredBy).toBe(true);
+    expect(parseConfig("powered_by: nope").poweredBy).toBe(true);
+  });
+});

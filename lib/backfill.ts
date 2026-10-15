@@ -1,5 +1,6 @@
 import { env } from "./env";
-import { parseConfig, CONFIG_PATH, DEFAULT_CONFIG, type ShiplogConfig } from "./config";
+import type { ShiplogConfig } from "./config";
+import { loadRepoConfig } from "./repo-config";
 import { buildHistoricalChangelog, changelogNeedsBackfill, type HistoricalPr, type HistoricalTag } from "./history";
 import {
   commitChangelogFile,
@@ -44,7 +45,7 @@ export async function backfillRepoHistory(installationId: string, repo: string, 
     return { repo, outcome: "skipped_no_origin" };
   }
 
-  const cfg = await loadConfig(installationId, repo);
+  const cfg = await loadRepoConfig(installationId, repo);
   if (!historyOpts(cfg).enabled) {
     await markDone(installationId, repo, `skipped:disabled:${new Date().toISOString()}`);
     return { repo, outcome: "skipped_disabled" };
@@ -103,10 +104,3 @@ export async function maybeBackfillOnFirstVisit(installationId: string, repo: st
   }
 }
 
-async function loadConfig(installationId: string, repo: string) {
-  try {
-    return parseConfig(await getRepoFile(installationId, repo, CONFIG_PATH));
-  } catch {
-    return DEFAULT_CONFIG;
-  }
-}

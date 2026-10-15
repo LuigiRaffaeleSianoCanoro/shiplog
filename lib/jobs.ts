@@ -6,7 +6,8 @@ import { draftAudienceNote, draftEntry, draftSummary } from "./llm";
 import { getRun, launchAgent } from "./cursor";
 import { open, parseMasterKey } from "./crypto";
 import { commentOnPr, getInstallationInfo, getRepoFile, listPrComments, listPrFiles, originConfigured, repoPermission } from "./origin";
-import { CONFIG_PATH, DEFAULT_CONFIG, excludedBy, notesEnabled, parseConfig, sectionFor, type ShiplogConfig } from "./config";
+import { DEFAULT_CONFIG, excludedBy, notesEnabled, sectionFor, type ShiplogConfig } from "./config";
+import { loadRepoConfig } from "./repo-config";
 import { allChangelogPaths, changelogTargets } from "./packages";
 import { mergeNotifyWebhooks, notifyWebhooks, type NotifyPayload } from "./notify";
 import { formatAudienceNotesBlock, notesStorageKey, releaseNotesInstructions, type AudienceNotes } from "./notes";
@@ -65,13 +66,6 @@ export async function pickMode(installationId: string): Promise<{ mode: JobMode;
   if (env.llmProvider === "neon") return { mode: "neon" };
   const key = await userKey(installationId);
   return key ? { mode: "cursor", key } : { mode: "fallback" };
-}
-
-/** The repo's .shiplog.yml, or defaults when Origin is not configured or the file is missing. */
-async function loadConfig(installationId: string, repo: string): Promise<ShiplogConfig> {
-  if (!originConfigured()) return DEFAULT_CONFIG;
-  try { return parseConfig(await getRepoFile(installationId, repo, CONFIG_PATH)); }
-  catch (e) { console.error("[shiplog] config load failed:", (e as Error).message); return DEFAULT_CONFIG; }
 }
 
 /** User webhooks must never block changelog or release work. */
@@ -247,7 +241,7 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
 
   const prNumber = String(pr?.number ?? payload?.pullRequest?.number ?? "");
   const info: PrInfo = { repo, number: prNumber, title: pr?.title ?? "", body: pr?.body ?? "", url: pr?.webUrl ?? (prNumber ? `${repoUrl(repo)}/pull/${prNumber}` : repoUrl(repo)) };
-  const cfg = await loadConfig(instId, repo);
+  const cfg = await loadRepoConfig(instId, repo);
   const picked = await pickMode(instId);
   const { mode, key } = cfg.mode === "prompt" && picked.mode === "cursor" ? { mode: "fallback" as const, key: undefined } : picked;
   const job: Job = { id: randomUUID(), deliveryId, installationId: instId, repo, prNumber, prUrl: info.url, kind, mode, status: "running", createdAt: now };
@@ -378,7 +372,7 @@ export async function flushBatches(): Promise<number> {
     try {
       const key = await userKey(installationId);
       if (!key) continue;
-      const cfg = await loadConfig(installationId, repo);
+      const cfg = await loadRepoConfig(installationId, repo);
       const changelogPath = path === "__default__" ? cfg.changelogPath : path;
       const entries = live.map(entryOf);
       const l = await launchAgent(key, batchPrompt(repo, entries, styleOf(cfg, changelogPath), undefined, undefined, changelogPath), repoUrl(repo));
@@ -432,7 +426,7 @@ export async function pollAgents(): Promise<number> {
         if (announce) {
           const paths = job.changelogPaths?.length ? job.changelogPaths : ["CHANGELOG.md"];
           await postComment(job.installationId, job.repo, job.prNumber, `**Shiplog** opened ${run.prUrl} updating ${pathsLabel(paths)}.`);
-          const cfg = await loadConfig(job.installationId, job.repo);
+          const cfg = await loadRepoConfig(job.installationId, job.repo);
           const detail = job.kind === "release" ? `Release PR: ${run.prUrl}` : `Changelog PR: ${run.prUrl}`;
           const payload: NotifyPayload = job.kind === "release"
             ? { event: "release_cut", repo: job.repo, prNumber: job.prNumber, prUrl: job.prUrl, detail }
