@@ -49,6 +49,9 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - 2026-10-15. Item 9. Initial changelog backfill runs on `installation.created` (all installation repos) and lazily on the first repo webhook when a repo was not covered yet. Idempotency uses `historyBackfillAt` on the installation record plus a check that the repo changelog file is still empty.
 - 2026-10-15. Item 9. History is built deterministically from merged PR titles (Keep a Changelog sections, exclude labels) and semver tags (tag commit time when Origin returns it). It commits through `git/commits:createFromFiles` when Origin is configured; neon test mode also mirrors into stored changelog.
 - 2026-10-15. Item 9. `.shiplog.yml` accepts `history.enabled`, `history.max_prs` and `history.max_tags` (snake_case aliases). Default helps first-time installs without extra config.
+- 2026-10-15. Item 10. Self-host guide lives at `docs/self-host.md` with README Deploy-to-Vercel button (clone URL on `feat/mvp`, env names prefilled, `envLink` to the guide). `.env.example` lists every variable read under `lib/` and `app/`. `test/env-docs.test.ts` enforces that list.
+- 2026-10-15. Item 10. Default recommendation for self-hosters is keyless mode (`SHIPLOG_BYOK_ENABLED=false`) for US$0 LLM spend; BYOK remains the production default for the maintainer deploy.
+- 2026-10-15. Item 10. No Neon AI Gateway on the build box; `npm test` and `npm run build` were run on the agent VM only. The first `next build` failed on a transient `next/font` Google fetch error; a immediate retry succeeded.
 
 ## Left to do
 
