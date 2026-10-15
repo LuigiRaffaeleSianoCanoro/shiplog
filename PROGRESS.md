@@ -58,6 +58,11 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - 2026-10-15. Item 11. `flushBatches` re-checks queued jobs before launch; `pollAgents` posts the PR comment only on the first transition to a PR URL.
 - 2026-10-15. Item 11. Implement, test and self-review were done directly on the agent VM. The Neon AI Gateway is not reachable from this environment (same as item 1).
 
+- 2026-10-15. Item 1 (CI activation). Moved `docs/ci/ci.yml` to `.github/workflows/ci.yml`. Steps: `npm ci`, `npx tsc --noEmit`, `npm test`, `npm run build`, then pinned gitleaks (unchanged from the parked workflow). Triggers on `main`, `feat/mvp`, and all pull requests.
+- 2026-10-15. Item 1 (CI activation). Did not add `docs/ci/cron-poll.yml` under `.github/workflows/` because it requires `CRON_SECRET` (and a real `SHIPLOG_URL`). The template stays in `docs/ci/` for operators who opt in.
+- 2026-10-15. Item 1 (CI activation). Added `.github/dependabot.yml` for weekly npm and github-actions updates (`open-pull-requests-limit: 10` each).
+- 2026-10-15. Item 1 (CI activation). Fixed `test/notify.test.ts` fetch mock typing so `npx tsc --noEmit` is clean (typed `vi.fn` args; read `init.body` with optional chaining).
+
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
@@ -71,8 +76,6 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - 2026-10-15. Item 13. Optional `packages` in `.shiplog.yml` maps a name to path globs and a changelog file. `orphan: root` (default) sends unmatched files to the root changelog; `orphan: ignore` drops PRs that touch only unmatched paths.
 - 2026-10-15. Item 13. One merged PR can update several changelogs. Agent and prompt modes use a single run with a multi-file prompt. Batch daily flush groups queued PRs by changelog path. Release bump notes and neon cuts iterate every configured changelog.
 - 2026-10-15. Item 13. Neon test mode stores each changelog under `repo::path` when the path is not the default `CHANGELOG.md`, so single-changelog repos keep the existing storage key.
-- Item 1. Move `docs/ci/ci.yml` to `.github/workflows/ci.yml` (needs a token with `workflow` scope, for example `gh auth refresh -s workflow`).
-
 - Item 6. Public page does not yet pull `CHANGELOG.md` from Origin for cursor or prompt mode installs. Luigi or a follow-up can add optional `.shiplog.yml` `public: true` plus Origin file fetch.
 - Item 8. Per-PR audience snippets (before release) and languages beyond en/es are not implemented.
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
