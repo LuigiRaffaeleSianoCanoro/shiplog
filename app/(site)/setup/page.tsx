@@ -1,6 +1,7 @@
 import { getStore } from "@/lib/store";
 import { env } from "@/lib/env";
 import SetupForm from "./SetupForm";
+import NotifyForm from "./NotifyForm";
 import { getInstallationInfo, originConfigured } from "@/lib/origin";
 import { cookies } from "next/headers";
 import { COOKIE, readSession } from "@/lib/session";
@@ -32,6 +33,7 @@ export default async function Setup({ searchParams }: { searchParams: Promise<{ 
           <p className="muted fade-up d1">Installed on <strong style={{ color: "var(--navy)" }}>{inst.namespace || inst.id}</strong>. Cursor apps can&apos;t launch agents themselves, so Shiplog uses a Cursor API key you provide. Cloud agents bill to <strong>the key&apos;s owner</strong>. Shiplog charges nothing.</p>
           {inst.namespaceType === "team" && <p className="muted"><span className="pill gray">Team install</span> Use a <strong>team service account key</strong> so usage bills to the team plan and keeps working if someone leaves. Create it under Cursor Dashboard → API Keys / service accounts.</p>}
           <SetupForm installationId={inst.id} byok={env.byokEnabled} connectedLast4={key?.last4 ?? null} connectedKind={key?.kind ?? null} team={inst.namespaceType === "team"} />
+          <NotifyForm installationId={inst.id} initial={await store.getNotifyWebhooks(inst.id)} />
           <p className="muted">No key? Shiplog still works: it posts a ready-to-run prompt on each merged PR. <a href={`/dashboard?installation_id=${encodeURIComponent(inst.id)}`}>Open dashboard</a></p>
         </>
       )}

@@ -6,6 +6,8 @@ export interface Installation {
   installerId?: string | null; namespaceType?: "user" | "team" | null;
   /** Per-repo backfill marker (ISO timestamp or skipped:reason:time). */
   historyBackfillAt?: Record<string, string>;
+  /** Installation-wide outbound notify webhooks (Slack, Discord, generic HTTPS). */
+  notifyWebhooks?: string[];
 }
 export type KeyKind = "personal" | "service_account";
 export interface UserKey extends Sealed { installationId: string; last4: string; createdAt: string; kind?: KeyKind; rotatedAt?: string | null }
@@ -34,4 +36,6 @@ export interface Store {
   /** Persisted unreleased changelog per repo (used by neon mode and release cuts). */
   getChangelog(repo: string): Promise<string | null>;
   putChangelog(repo: string, md: string): Promise<void>;
+  getNotifyWebhooks(installationId: string): Promise<string[]>;
+  putNotifyWebhooks(installationId: string, webhooks: string[]): Promise<void>;
 }

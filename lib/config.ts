@@ -1,5 +1,6 @@
 import { parse } from "yaml";
 import { classify, SECTIONS, type Section } from "./changelog";
+import { parseNoteAudiences, parseNoteLanguages, type NoteAudience, type NoteLanguage } from "./notes";
 
 export type ConfigMode = "agent" | "prompt";
 export interface ShiplogConfig {
@@ -15,6 +16,10 @@ export interface ShiplogConfig {
   batch: BatchMode;
   /** Initial changelog backfill from merged PRs and tags (install time). */
   history: HistoryConfig;
+  /** Optional per-audience release notes (technical and customer) with en/es output. */
+  notes: { audiences: NoteAudience[]; languages: NoteLanguage[] };
+  /** Optional outbound webhook URLs (Slack incoming, Discord, or generic HTTPS POST). */
+  notify: { webhooks: string[] };
 }
 export type BatchMode = "off" | "release" | "daily";
 export interface HistoryConfig {
@@ -29,6 +34,8 @@ export const DEFAULT_CONFIG: ShiplogConfig = {
   sections: {}, exclude: { labels: ["skip-changelog"], authors: [] },
   language: "en", tone: "concise, user-facing", changelogPath: "CHANGELOG.md", mode: "agent", batch: "off",
   history: DEFAULT_HISTORY,
+  notes: { audiences: [], languages: ["en", "es"] },
+  notify: { webhooks: [] },
 };
 
 const str = (v: unknown, max = 80) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
@@ -62,7 +69,16 @@ export function parseConfig(text: string | null): ShiplogConfig {
       maxPrs: posInt(raw.history?.maxPrs ?? raw.history?.max_prs, 500, DEFAULT_HISTORY.maxPrs),
       maxTags: posInt(raw.history?.maxTags ?? raw.history?.max_tags, 200, DEFAULT_HISTORY.maxTags),
     },
+    notes: {
+      audiences: parseNoteAudiences(raw.notes?.audiences),
+      languages: parseNoteLanguages(raw.notes?.languages),
+    },
+    notify: { webhooks: strList(raw.notify?.webhooks) ?? [] },
   };
+}
+
+export function notesEnabled(c: ShiplogConfig) {
+  return c.notes.audiences.length > 0;
 }
 
 export function sectionFor(title: string, c: ShiplogConfig): Section | null {

@@ -31,11 +31,21 @@ tone: concise, user-facing
 changelog: CHANGELOG.md
 mode: agent          # or "prompt": never launch an agent, post a ready-to-run prompt instead
 batch: off           # "release": one agent per release; "daily": one agent per repo per day (cron)
+notes:
+  audiences: [technical, customer]   # omit or leave empty to disable
+  languages: [en, es]                # defaults to en and es when audiences are set
+notify:
+  webhooks:          # optional HTTPS URLs (Slack, Discord, or generic JSON POST)
+    - https://hooks.slack.com/services/…
 history:             # initial CHANGELOG backfill on install (merged PRs + semver tags)
   enabled: true
   max_prs: 100
   max_tags: 50
 ```
+
+When `notes.audiences` is set, Shiplog also drafts **technical** and **customer-facing** release notes in each listed language. In test mode (Neon) they are stored under a repo key like `owner/repo::notes::1.2.0` and posted on the release comment. With a Cursor key, the release agent is asked to write `.shiplog/notes/<version>/<audience>.<lang>.md` files alongside the changelog.
+
+Installation-wide webhooks can also be set on `/setup` (same session as the Cursor key). Shiplog POSTs on changelog entries and releases; failures are logged only.
 
 On first install (and on the first webhook per repo), Shiplog can seed `CHANGELOG.md` from merged pull requests and existing semver tags when the file is still empty. Re-runs are skipped unless you call `POST /api/history/backfill` from an authenticated setup session with `{ "installationId", "repo?", "force": true }`.
 

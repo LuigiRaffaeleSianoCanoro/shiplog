@@ -52,4 +52,13 @@ export class SupabaseStore implements Store {
   async putChangelog(repo: string, md: string) {
     await this.q("shiplog_changelogs?on_conflict=repo", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal", body: JSON.stringify({ repo, markdown: md, updated_at: new Date().toISOString() }) });
   }
+  private notifyKey(id: string) { return `@notify:${id}`; }
+  async getNotifyWebhooks(id: string) {
+    const raw = await this.getChangelog(this.notifyKey(id));
+    if (!raw) return [];
+    try { return (JSON.parse(raw) as { webhooks?: string[] }).webhooks ?? []; } catch { return []; }
+  }
+  async putNotifyWebhooks(id: string, webhooks: string[]) {
+    await this.putChangelog(this.notifyKey(id), JSON.stringify({ webhooks }));
+  }
 }
