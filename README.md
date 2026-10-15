@@ -40,6 +40,8 @@ Comment on a PR before it merges. Only the installer or someone with write or ad
 - `/shiplog entry "Faster cold starts on Linux"` uses this exact text as the bullet.
 - `/shiplog release v1.2.0` cuts release notes.
 
+Breaking changes (`feat!:` titles or a `BREAKING CHANGE:` footer) are marked `**BREAKING:**` in the changelog, and the release comment suggests a major, minor or patch bump.
+
 The `no-changelog` label always skips a PR, as does any label in `exclude.labels` (default `skip-changelog`).
 
 ## Security

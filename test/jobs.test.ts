@@ -215,6 +215,28 @@ describe("PR commands", () => {
   });
 });
 
+describe("breaking changes in jobs", () => {
+  it("marks a breaking entry and suggests a major bump on release", async () => {
+    const { store, jobs } = await setup({ SHIPLOG_LLM_PROVIDER: "neon", NEON_AI_GATEWAY_BASE_URL: "https://gw.test", NEON_AI_GATEWAY_TOKEN: "t" });
+    const replies = [JSON.stringify({ section: "Changed", bullet: "Config moved to .shiplog.yml" }), "Big release."];
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: replies.shift() } }] }))));
+    await store.putChangelog("luigi/demo", "# Changelog\n\n## [Unreleased]\n\n## [1.4.2] - 2026-01-01\n\n### Fixed\n\n- x\n");
+    await jobs.handleEvent(merged("30", "feat!: move config"), "b1");
+    expect(await store.getChangelog("luigi/demo")).toContain("- **BREAKING:** Config moved to .shiplog.yml (#30)");
+    await store.upsertInstallation({ ...(await store.getInstallation("i_1"))!, installerId: "u" });
+    await jobs.handleEvent({ installationId: "i_1", event: { type: "pull_request.comment.created", payload: { pullRequest: { number: "30", repository: { name: "demo", owner: { slug: "luigi" } } }, comment: { body: "/shiplog release v1.5.0", author: { user: { id: "u" } } } } } }, "b2");
+    const rel = (await store.listOutbox()).find((o: any) => o.body.includes("release notes"))!;
+    expect(rel.body).toContain("Suggested bump: **major** (1.4.2 to 2.0.0)"); expect(rel.body).toContain("You asked for v1.5.0");
+    vi.unstubAllGlobals();
+  });
+
+  it("tells the agent to mark breaking entries", async () => {
+    const { jobs } = await setup({});
+    const job = await jobs.handleEvent(merged("31", "feat(api)!: rename endpoint"), "b3");
+    expect(job?.result).toContain("**BREAKING:**");
+  });
+});
+
 describe("llm content shapes", () => {
   it("accepts array-of-blocks content", async () => {
     vi.resetModules();
