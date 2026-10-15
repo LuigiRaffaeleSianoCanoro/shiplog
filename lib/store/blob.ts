@@ -10,6 +10,12 @@ import type { Installation, Job, Outbox, Store, UserKey } from "./types";
  */
 const P = "shiplog/v1";
 const enc = (s: string) => encodeURIComponent(s).replace(/%/g, "_");
+const dec = (s: string) => decodeURIComponent(s.replace(/_/g, "%"));
+function changelogKeyFromPathname(pathname: string): string | null {
+  const prefix = `${P}/changelogs/`;
+  if (!pathname.startsWith(prefix) || !pathname.endsWith(".json")) return null;
+  return dec(pathname.slice(prefix.length, -".json".length));
+}
 const opts = { access: "private" as const, contentType: "application/json", addRandomSuffix: false, cacheControlMaxAge: 60 };
 
 async function readJson<T>(pathname: string): Promise<T | null> {
@@ -54,6 +60,16 @@ export class BlobStore implements Store {
   async listOutbox(id?: string) { return readAll<Outbox>(id ? `${P}/outbox/${enc(id)}/` : `${P}/outbox/`, 50); }
   async getChangelog(repo: string) { return (await readJson<{ markdown: string }>(`${P}/changelogs/${enc(repo)}.json`))?.markdown ?? null; }
   async putChangelog(repo: string, md: string) { await write(`${P}/changelogs/${enc(repo)}.json`, { markdown: md, updatedAt: new Date().toISOString() }); }
+  async listChangelogKeysForRepo(repoSlug: string) {
+    const { blobs } = await list({ prefix: `${P}/changelogs/`, limit: 1000 });
+    const keys: string[] = [];
+    for (const b of blobs) {
+      const key = changelogKeyFromPathname(b.pathname);
+      if (!key) continue;
+      if (key === repoSlug || key.startsWith(`${repoSlug}::`)) keys.push(key);
+    }
+    return keys.sort();
+  }
   async acquireCronPollLock(ttlMs: number) {
     const now = Date.now();
     const cur = await readJson<CronPollLock>(CRON_LOCK);

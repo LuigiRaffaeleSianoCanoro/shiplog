@@ -55,6 +55,40 @@ When `notes.audiences` is set, Shiplog also drafts **technical** and **customer-
 
 Installation-wide webhooks can also be set on `/setup` (same session as the Cursor key). Shiplog POSTs on changelog entries and releases; failures are logged only.
 
+## Read-only changelog API and MCP (roadmap item 14)
+
+The same changelog data as the public page (`/{namespace}/{repo}`) is available as versioned JSON and through a read-only MCP server. Visibility matches the public site: only **active** installations, safe slug segments, no disconnected installs.
+
+### HTTP JSON API (`apiVersion: v1`)
+
+- `GET /api/v1/changelogs/{namespace}/{repo}` — full structured changelog (releases, sections, links to feeds and MCP).
+- `GET /api/v1/changelogs/{namespace}/{repo}/releases/{version}` — one release (`version` may include or omit a `v` prefix).
+- `GET /api/v1/changelogs/{namespace}/{repo}/packages` — root flag plus monorepo changelog paths discovered in storage (excludes notes and notify blobs).
+- Monorepo: add `?changelog=packages/web/CHANGELOG.md` on the changelog or release endpoints.
+
+Responses use `Cache-Control: public, max-age=60, stale-while-revalidate=300`.
+
+Example:
+
+```bash
+curl -sS "https://<your-host>/api/v1/changelogs/luigi/shiplog-demo"
+curl -sS "https://<your-host>/api/v1/changelogs/luigi/shiplog-demo/releases/1.0.0"
+```
+
+### MCP server (Streamable HTTP)
+
+Endpoint: `https://<your-host>/api/mcp` (stateless, read-only tools).
+
+Tools:
+
+- `get_changelog` — `{ namespace, repo, changelog? }`
+- `get_release` — `{ namespace, repo, version, changelog? }`
+- `list_packages` — `{ namespace, repo }`
+
+**Cursor:** open **Settings → MCP → Add server**, choose URL / Streamable HTTP, and set the server URL to `https://<your-host>/api/mcp`. Agents can then call the tools above without extra auth (same public visibility as the changelog page).
+
+MCP clients must send `Accept: application/json, text/event-stream` on POST requests (the MCP Streamable HTTP transport).
+
 On first install (and on the first webhook per repo), Shiplog can seed `CHANGELOG.md` from merged pull requests and existing semver tags when the file is still empty. Re-runs are skipped unless you call `POST /api/history/backfill` from an authenticated setup session with `{ "installationId", "repo?", "force": true }`.
 
 When `packages` is set, Shiplog loads the merged PR's changed files from the Origin API (`GET .../pulls/{number}/files`, scope `repository:pull_requests:read`, already requested) and drafts an entry in every matching package changelog. `/shiplog` commands, labels and classification apply to all targeted changelogs for that PR. Release comments include a semver suggestion per changelog file.
