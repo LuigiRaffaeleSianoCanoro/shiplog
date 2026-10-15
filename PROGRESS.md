@@ -25,12 +25,19 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR pe
 - 2026-10-15. Item 5. Breaking entries are marked in the changelog with a `**BREAKING:**` prefix. That keeps the signal in the file itself, so the release suggestion needs no extra stored state and works for agent-written changelogs too.
 - 2026-10-15. Item 5. Bump rule follows semver with Keep a Changelog sections. Breaking or Removed gives major, Added or Deprecated gives minor, everything else patch. The suggestion is advisory. Shiplog still cuts the version the user asked for and flags a mismatch.
 - 2026-10-15. Item 5. For agent and prompt modes the suggestion reads the repo's changelog file through Origin. Without Origin credentials there is no suggestion.
+- 2026-10-15. Item 4. Batch mode is a `.shiplog.yml` option (`batch: off`, `release` or `daily`), default off so current installs keep one agent per PR.
+- 2026-10-15. Item 4. Queued PRs are ordinary jobs with status `queued` (already in the Job type) and their entry data as JSON in `result`. No schema change, so no Supabase migration.
+- 2026-10-15. Item 4. `batch: release` folds every queued PR into the release agent run, so a release costs one run total. `batch: daily` flushes from the existing daily Vercel cron (`/api/cron/poll`), one agent per repo. The dashboard view does not flush, so opening it never spends money.
+- 2026-10-15. Item 4. Batching applies only to Cursor agent mode. Prompt and Neon modes cost the key owner nothing, so they stay per PR.
+- 2026-10-15. Item 4. The dashboard shows agent runs per installation (last 30 days and total) and which key pays (personal or service account). Runs are counted from jobs with an agent id. Exact credit cost is not available from the Cursor API used here.
 
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
 - Item 3. Without Origin credentials (local runs) commands are not read at merge time. Only labels apply there.
 - Item 5. Pre-1.0 versions get plain semver bumps (0.x to 1.0.0 on breaking). No special 0.x rule.
+- Item 4. Queued PRs wait forever if `batch: release` is set and no release is ever cut, or if the key is removed. A dashboard flush button or expiry would close this.
+- Item 4. Run cost in money is not shown, only the run count.
 - Item 1. Move `docs/ci/ci.yml` to `.github/workflows/ci.yml` (needs a token with `workflow` scope, for example `gh auth refresh -s workflow`).
 
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).

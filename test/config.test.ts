@@ -61,3 +61,12 @@ describe("no-changelog and Origin author fields", () => {
     expect(excludedBy({ author: { app: { id: "a1", displayName: "Acme CI" } } }, c)).toBe("author Acme CI");
   });
 });
+
+describe("batch option", () => {
+  it("accepts release and daily, defaults to off", () => {
+    expect(parseConfig("batch: release").batch).toBe("release");
+    expect(parseConfig("batch: daily").batch).toBe("daily");
+    expect(parseConfig("batch: hourly").batch).toBe("off");
+    expect(DEFAULT_CONFIG.batch).toBe("off");
+  });
+});

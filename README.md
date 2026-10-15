@@ -30,6 +30,7 @@ language: en
 tone: concise, user-facing
 changelog: CHANGELOG.md
 mode: agent          # or "prompt": never launch an agent, post a ready-to-run prompt instead
+batch: off           # "release": one agent per release; "daily": one agent per repo per day (cron)
 ```
 
 ## PR commands
