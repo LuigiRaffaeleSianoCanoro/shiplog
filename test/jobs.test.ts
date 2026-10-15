@@ -146,6 +146,75 @@ describe(".shiplog.yml in jobs", () => {
   });
 });
 
+describe("PR commands", () => {
+  const pem = generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  const env_ = { ORIGIN_APP_ID: "app_1", ORIGIN_APP_PRIVATE_KEY: pem };
+  const owner = { user: { id: "user_owner" } };
+  const stranger = { user: { id: "user_x" } };
+  const origin = (comments: any[]) => vi.fn(async (url: string, init?: any) => {
+    const u = String(url);
+    if (u.includes("/access_tokens")) return new Response(JSON.stringify({ token: "tok" }));
+    if (u.includes("/contents")) return new Response("{}", { status: 404 });
+    if (u.includes("/permission")) return new Response(JSON.stringify({ permission: "read" }));
+    if (u.includes("/comments") && init?.method !== "POST") return new Response(JSON.stringify({ comments, nextPageToken: "" }));
+    return new Response("{}");
+  });
+  const withOwner = async (store: any) => store.upsertInstallation({ id: "i_1", namespace: "luigi", status: "active", createdAt: "", installerId: "user_owner" });
+  const comment = (body: string, author: any) => ({ installationId: "i_1", event: { type: "pull_request.comment.created", payload: { pullRequest: { number: "20", repository: { name: "demo", owner: { slug: "luigi" } } }, comment: { body, author } } } });
+
+  it("/shiplog skip from the installer → merge is ignored", async () => {
+    const { store, jobs } = await setup(env_); await withOwner(store);
+    vi.stubGlobal("fetch", origin([{ body: "/shiplog skip", author: owner }]));
+    const job = await jobs.handleEvent(merged("20", "feat: x"), "p1");
+    expect(job?.status).toBe("ignored"); expect(job?.result).toContain("/shiplog skip");
+    vi.unstubAllGlobals();
+  });
+
+  it("commands from users without write access are not honored", async () => {
+    const { store, jobs } = await setup(env_); await withOwner(store);
+    vi.stubGlobal("fetch", origin([{ body: "/shiplog skip", author: stranger }]));
+    expect((await jobs.handleEvent(merged("20", "feat: x"), "p2"))?.status).toBe("done");
+    vi.unstubAllGlobals();
+  });
+
+  it("/shiplog entry overrides the bullet text; the latest command wins", async () => {
+    const { store, jobs } = await setup(env_); await withOwner(store);
+    vi.stubGlobal("fetch", origin([{ body: "/shiplog skip", author: owner }, { body: '/shiplog entry "Faster cold starts"', author: owner }]));
+    const job = await jobs.handleEvent(merged("20", "perf: cache"), "p3");
+    expect(job?.status).toBe("done"); expect(job?.result).toContain("Faster cold starts");
+    vi.unstubAllGlobals();
+  });
+
+  it("neon mode writes the entry text without calling the model", async () => {
+    const { store, jobs } = await setup({ ...env_, SHIPLOG_LLM_PROVIDER: "neon", NEON_AI_GATEWAY_BASE_URL: "https://gw.test", NEON_AI_GATEWAY_TOKEN: "t" });
+    await withOwner(store);
+    const f = origin([{ body: '/shiplog entry "Faster cold starts"', author: owner }]);
+    vi.stubGlobal("fetch", f);
+    await jobs.handleEvent(merged("20", "perf: cache"), "p4");
+    expect(await store.getChangelog("luigi/demo")).toContain("### Changed\n\n- Faster cold starts (#20)");
+    expect(f.mock.calls.some((c: any) => String(c[0]).includes("gw.test"))).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it("acknowledges an authorized command and refuses others", async () => {
+    const { store, jobs } = await setup(env_); await withOwner(store);
+    vi.stubGlobal("fetch", origin([]));
+    expect(await jobs.handleEvent(comment("/shiplog skip", owner), "p5")).toBeNull();
+    expect(await jobs.handleEvent(comment('/shiplog entry "x"', stranger), "p6")).toBeNull();
+    const bodies = (await store.listOutbox()).map((o: any) => o.body);
+    expect(bodies).toHaveLength(2);
+    expect(bodies.some((b: string) => b.includes("will skip the changelog"))).toBe(true);
+    expect(bodies.some((b: string) => b.includes("`/shiplog entry` can only be run") && b.includes("write or admin"))).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("no-changelog label is honored", async () => {
+    const { jobs } = await setup({});
+    const ev = merged("21", "feat: x"); (ev.event.payload.pullRequest as any).labels = [{ name: "no-changelog" }];
+    expect((await jobs.handleEvent(ev, "p7"))?.status).toBe("ignored");
+  });
+});
+
 describe("llm content shapes", () => {
   it("accepts array-of-blocks content", async () => {
     vi.resetModules();

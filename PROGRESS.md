@@ -15,10 +15,17 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR pe
 - 2026-10-15. Item 2. Excluded PRs are recorded as `ignored` jobs with the reason and get no comment, to keep PRs quiet. Default exclude label is `skip-changelog`.
 - 2026-10-15. Item 2. `mode: prompt` downgrades only the Cursor agent mode to the prompt fallback. Neon test mode is left alone because it is an operator switch.
 - 2026-10-15. Item 2. Config is loaded once per event, no caching. One extra Origin read per event is cheap and avoids stale config.
+- 2026-10-15. Item 3. `/shiplog skip` and `/shiplog entry` are read back from the PR's comments at merge time (Origin List Pull Request Comments) instead of being stored. No new store table, so no Supabase change, and an edited or later command simply wins.
+- 2026-10-15. Item 3. Commands use the same authorization as `/shiplog release` (installer, or write or admin on the repo). Unauthorized commands get the refusal comment and are ignored at merge.
+- 2026-10-15. Item 3. Shiplog acknowledges each accepted command with a comment so the author knows it registered.
+- 2026-10-15. Item 3. `no-changelog` is always honored, even when `.shiplog.yml` overrides `exclude.labels`.
+- 2026-10-15. Item 3. In Neon test mode an entry override is written directly, with no model call. Agent and prompt modes pass it to the agent verbatim inside an `<entry>` tag.
+- 2026-10-15. Item 3. Fixed author matching from item 2 to read Origin's real fields (`user.handle`, `app.displayName`, `serviceAccount.displayName`) per the List Pull Request Comments schema.
 
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
+- Item 3. Without Origin credentials (local runs) commands are not read at merge time. Only labels apply there.
 - Item 1. Move `docs/ci/ci.yml` to `.github/workflows/ci.yml` (needs a token with `workflow` scope, for example `gh auth refresh -s workflow`).
 
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).

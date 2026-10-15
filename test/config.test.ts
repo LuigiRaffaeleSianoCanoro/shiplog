@@ -49,3 +49,15 @@ mode: prompt
     expect(excludedBy({ labels: [{ name: "skip-changelog" }] }, DEFAULT_CONFIG)).toBe("label skip-changelog");
   });
 });
+
+describe("no-changelog and Origin author fields", () => {
+  it("always honors no-changelog, even when labels are overridden", () => {
+    const c = parseConfig("exclude:\n  labels: [wip]");
+    expect(excludedBy({ labels: [{ name: "no-changelog" }] }, c)).toBe("label no-changelog");
+  });
+  it("matches Origin user handles and app display names", () => {
+    const c = parseConfig("exclude:\n  authors: [jane, Acme CI]");
+    expect(excludedBy({ author: { user: { id: "u1", handle: "jane" } } }, c)).toBe("author jane");
+    expect(excludedBy({ author: { app: { id: "a1", displayName: "Acme CI" } } }, c)).toBe("author Acme CI");
+  });
+});

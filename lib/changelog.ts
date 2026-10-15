@@ -72,6 +72,16 @@ export function parseReleaseCommand(text: string): string | null {
   return m ? m[2] : null;
 }
 
+export type PrCommand = { kind: "skip" } | { kind: "entry"; text: string };
+/** `/shiplog skip` or `/shiplog entry "text"` (straight or curly quotes). */
+export function parsePrCommand(text: string): PrCommand | null {
+  const m = /(?:^|\s)\/shiplog\s+(skip|entry)\b(?:\s+["“]([^"”\n]*)["”])?/i.exec(text);
+  if (!m) return null;
+  if (m[1].toLowerCase() === "skip") return { kind: "skip" };
+  const t = (m[2] ?? "").trim().slice(0, 200);
+  return t ? { kind: "entry", text: t } : null;
+}
+
 /** Tag pushes (native Origin repos only; repository.pushed isn't delivered for GitHub mirrors). */
 export function tagsFromPush(payload: any): string[] {
   const ups: any[] = payload?.refUpdates ?? [];
@@ -85,8 +95,14 @@ export interface Style { changelogPath: string; language: string; tone: string }
 const DEFAULT_STYLE: Style = { changelogPath: "CHANGELOG.md", language: "en", tone: "concise, user-facing" };
 
 /** Prompt for the agent (cursor mode) and for the fallback comment. PR text is untrusted. */
-export function changelogPrompt(pr: PrInfo, section: Section | null, style: Style = DEFAULT_STYLE) {
+export function changelogPrompt(pr: PrInfo, section: Section | null, style: Style = DEFAULT_STYLE, entry?: string) {
   const f = style.changelogPath;
+  if (entry) return [
+    `Update ${f} in ${pr.repo} for merged PR #${pr.number} (${pr.url}).`,
+    `Follow Keep a Changelog 1.1.0. Add exactly this bullet, verbatim, followed by " (#${pr.number})", under "## [Unreleased]" → "### ${section ?? "Changed"}". Create ${f} or the headings if missing.`,
+    `<entry>${entry}</entry>`,
+    `Only edit ${f}. Do not change any other file. Open a PR titled "docs(changelog): PR #${pr.number}".`,
+  ].join("\n");
   return [
     `Update ${f} in ${pr.repo} for merged PR #${pr.number} (${pr.url}).`,
     `Follow Keep a Changelog 1.1.0. Add exactly one bullet under "## [Unreleased]" → "### ${section ?? "<pick one of: Added, Changed, Deprecated, Removed, Fixed, Security>"}". Create ${f} or the headings if missing; keep section order Added, Changed, Deprecated, Removed, Fixed, Security.`,
