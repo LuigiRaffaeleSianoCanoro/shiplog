@@ -77,11 +77,13 @@ describe("notifyWebhooks delivery", () => {
   it("POSTs Slack and generic bodies to each URL", async () => {
     const slack = "https://hooks.slack.com/services/T/B/x";
     const generic = "https://example.com/notify";
-    const f = vi.fn(async () => new Response("", { status: 200 }));
+    const f = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () => new Response("", { status: 200 }),
+    );
     vi.stubGlobal("fetch", f);
     await notifyWebhooks([slack, generic], payload);
     expect(f).toHaveBeenCalledTimes(2);
-    const bodies = f.mock.calls.map((c) => JSON.parse(String((c[1] as RequestInit).body)));
+    const bodies = f.mock.calls.map((c) => JSON.parse(String(c[1]?.body)));
     expect(bodies[0]).toHaveProperty("text");
     expect(bodies[1].event).toBe("changelog_entry");
   });

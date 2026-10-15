@@ -4,13 +4,13 @@ html, body { margin:0; background:var(--bg); color:var(--ink); font-family: var(
 body { background: var(--bg) url(/brand/texture-subway-tile.png) repeat; background-size: 256px; min-height: 100vh; }
 a { color: inherit; }
 code { font-family: var(--mono); font-size: .9em; }
-h1, h2, h3 { font-family: var(--font-display), sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: .005em; color: var(--navy); margin: 0 0 .5rem; }
+h1, h2, h3 { font-family: var(--font-display), sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: .005em; color: var(--navy); margin: 0 0 .5rem; }
 h1 { font-size: clamp(2.8rem, 7vw, 5.4rem); line-height: .95; }
 h3 { font-size: 1.5rem; }
 .accent { color: var(--red); }
 .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; position: relative; }
 header.top { display:flex; align-items:center; justify-content:space-between; padding: 18px 32px; background: var(--bg); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; gap: 12px; flex-wrap: wrap; }
-.brand { display:flex; gap:8px; align-items:center; font-family: var(--font-display); font-weight:900; font-size:1.5rem; letter-spacing:.02em; text-decoration:none; color: var(--navy); }
+.brand { display:flex; gap:8px; align-items:center; font-family: var(--font-display); font-weight:700; font-size:1.5rem; letter-spacing:.02em; text-decoration:none; color: var(--navy); }
 .brand img { width:28px; height:28px; }
 nav { display:flex; align-items:center; gap: 18px; flex-wrap: wrap; }
 nav a { color: var(--ink); text-decoration:none; font-size:.92rem; font-weight:600; } nav a:hover { color: var(--red); }
@@ -50,7 +50,7 @@ table { width:100%; border-collapse: collapse; font-size: .9rem; } td, th { text
 .waterline h3 { color: #fff; }
 .waterline .panel { background: #1B2D6B; border-color: #2C3F80; box-shadow: none; color: #fff; }
 .waterline .muted, .waterline footer { color: #B9C2E0; }
-.step { font-family: var(--font-display); font-weight:900; color: var(--red); font-size: 2.2rem; line-height: 1; }
+.step { font-family: var(--font-display); font-weight:700; color: var(--red); font-size: 2.2rem; line-height: 1; }
 .page { margin-top: 32px; margin-bottom: 48px; padding-top: 32px; padding-bottom: 32px; background: var(--bg); border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 2px 0 var(--line), 0 18px 40px -24px rgba(19,35,90,.45); }
 .page .panel { box-shadow: 0 1px 0 var(--line); }
 .hero-card { background: var(--bg); border: 1px solid var(--line); border-top: 5px solid var(--red); border-radius: 20px; padding: 32px; box-shadow: 0 2px 0 var(--line), 0 18px 40px -24px rgba(19,35,90,.45); }

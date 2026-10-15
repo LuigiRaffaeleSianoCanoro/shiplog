@@ -71,6 +71,10 @@ Breaking changes (`feat!:` titles or a `BREAKING CHANGE:` footer) are marked `**
 
 The `no-changelog` label always skips a PR, as does any label in `exclude.labels` (default `skip-changelog`).
 
+## Contributing
+
+Pull requests and pushes to `main` or `feat/mvp` run CI (`.github/workflows/ci.yml`): `npm ci`, `npx tsc --noEmit`, `npm test`, `npm run build`, and a gitleaks secret scan. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Security
 - Webhooks: Origin `v1ed` scheme. Ed25519 over lowercase-hex SHA-256 of `"<webhook-id>.<webhook-timestamp>.<raw body>"`, checked against the JWKS (cached 10 min, refreshed on an unknown key), with a ±5 min window and dedupe on `webhook-id`. The receiver returns 202 and does the work in `after()`.
 - Keys: AES-256-GCM, random 12-byte IV per record, installation id bound as AAD, `key_version` for rotation. Only the last 4 characters are shown and keys are never logged. Setting or removing a key requires the session cookie issued by a verified install receipt.
