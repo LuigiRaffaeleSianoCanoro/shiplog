@@ -1,6 +1,6 @@
 # Progress and decision log
 
-Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR per item against `feat/mvp`.
+Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 7). One small PR per item against `feat/mvp`.
 
 ## Decisions
 
@@ -31,6 +31,12 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR pe
 - 2026-10-15. Item 4. Batching applies only to Cursor agent mode. Prompt and Neon modes cost the key owner nothing, so they stay per PR.
 - 2026-10-15. Item 4. The dashboard shows agent runs per installation (last 30 days and total) and which key pays (personal or service account). Runs are counted from jobs with an agent id. Exact credit cost is not available from the Cursor API used here.
 
+- 2026-10-15. Item 7. Outbound notify webhooks are optional HTTPS URLs the user provides (Slack incoming webhook, Discord webhook, or generic JSON POST). Shiplog POSTs from the server with `fetch`; Luigi pays no email or messaging vendor.
+- 2026-10-15. Item 7. URLs are stored per installation on the setup page (`/api/notify`, session-gated like keys) and/or per repo in `.shiplog.yml` as `notify.webhooks`. Blob and memory stores keep them on the installation record; Supabase stores installation URLs in the existing changelogs table under `@notify:<installationId>` so no migration is needed.
+- 2026-10-15. Item 7. Events: changelog entry written (neon test mode immediately; Cursor mode when the agent PR is detected) and release cut (neon immediately; Cursor when the release PR is detected). Queued batch PRs notify only when the batch agent finishes. Prompt-only fallback does not notify (no changelog file write).
+- 2026-10-15. Item 7. Delivery failures are logged with query strings redacted and never fail the job. Invalid URLs are skipped at save time and at send time.
+- 2026-10-15. Item 7. No Neon AI Gateway credentials on the cloud agent VM; implementation and tests were done directly by the agent (same pattern as items 1–6).
+
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
@@ -42,3 +48,4 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR pe
 
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
 - Item 1. Enable secret scanning, push protection, Dependabot and private vulnerability reporting in GitHub settings. Add CODEOWNERS and issue templates.
+- Item 7. Email notifications are out of scope (webhook-only per roadmap). Retry/backoff for failed webhooks is not implemented.
