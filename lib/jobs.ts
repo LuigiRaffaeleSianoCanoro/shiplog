@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import { env } from "./env";
 import { getStore, type Job, type JobMode } from "./store";
 import { addEntry, batchPrompt, BREAKING_MARK, bumpNote, changelogPrompt, isBreaking, cutRelease, parsePrCommand, parseReleaseCommand, type PrCommand, releasePrompt, tagsFromPush, unreleased, type PrInfo, type QueuedEntry } from "./changelog";
-import { draftEntry, draftSummary } from "./llm";
+import { draftAudienceNote, draftEntry, draftSummary } from "./llm";
 import { getRun, launchAgent } from "./cursor";
 import { open, parseMasterKey } from "./crypto";
 import { commentOnPr, getInstallationInfo, getRepoFile, listPrComments, originConfigured, repoPermission } from "./origin";
-import { CONFIG_PATH, DEFAULT_CONFIG, excludedBy, parseConfig, sectionFor, type ShiplogConfig } from "./config";
+import { CONFIG_PATH, DEFAULT_CONFIG, excludedBy, notesEnabled, parseConfig, sectionFor, type ShiplogConfig } from "./config";
+import { formatAudienceNotesBlock, notesStorageKey, releaseNotesInstructions, type AudienceNotes } from "./notes";
 
 export interface Envelope {
   deliveryId?: string; installationId: string;
@@ -81,6 +82,23 @@ async function latestPrCommand(installationId: string, repo: string, prNumber: s
     if (cmd && (await canRelease(installationId, repo, c.author))) return cmd;
   }
   return null;
+}
+
+/** Suggested semver bump for a release, from the stored changelog (neon) or the repo's changelog file (agent and prompt). */
+function releaseNoteExtras(cfg: ShiplogConfig, version: string): string | undefined {
+  if (!notesEnabled(cfg)) return undefined;
+  return releaseNotesInstructions(version, cfg.notes.audiences, cfg.notes.languages);
+}
+
+async function draftStoredAudienceNotes(cfg: ShiplogConfig, version: string, unreleasedMd: string): Promise<AudienceNotes> {
+  const bundle: AudienceNotes = {};
+  for (const audience of cfg.notes.audiences) {
+    bundle[audience] = {};
+    for (const lang of cfg.notes.languages) {
+      bundle[audience]![lang] = await draftAudienceNote(version, unreleasedMd, audience, lang);
+    }
+  }
+  return bundle;
 }
 
 /** Suggested semver bump for a release, from the stored changelog (neon) or the repo's changelog file (agent and prompt). */
@@ -204,16 +222,23 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
         const md = cutRelease(before, v, today(), summary);
         await store.putChangelog(repo, md);
         job.result = `## [${v.replace(/^v/, "")}] - ${today()}\n\n${summary}\n\n${notes}`;
-        await postComment(instId, repo, prNumber, withNote(`**Shiplog** release notes for **${v}**:\n\n\`\`\`md\n${job.result}\n\`\`\``));
+        let audienceBlock = "";
+        if (notesEnabled(cfg) && notes) {
+          const bundle = await draftStoredAudienceNotes(cfg, v, notes);
+          await store.putChangelog(notesStorageKey(repo, v), JSON.stringify(bundle, null, 2));
+          audienceBlock = `\n\n${formatAudienceNotesBlock(v, bundle)}`;
+        }
+        await postComment(instId, repo, prNumber, withNote(`**Shiplog** release notes for **${v}**:\n\n\`\`\`md\n${job.result}\n\`\`\`${audienceBlock}`));
       } else if (mode === "cursor") {
         const queued = await queuedFor(instId, repo);
-        const prompt = queued.length ? batchPrompt(repo, queued.map(entryOf), cfg, { version: v, date: today() }) : releasePrompt(repo, v, today(), cfg);
+        const extra = releaseNoteExtras(cfg, v);
+        const prompt = queued.length ? batchPrompt(repo, queued.map(entryOf), cfg, { version: v, date: today() }, extra) : releasePrompt(repo, v, today(), cfg, extra);
         const l = await launchAgent(key!, prompt, repoUrl(repo));
         job.agentId = l.agentId; job.runId = l.runId; job.result = `agent ${l.agentId}${queued.length ? ` (${queued.length} queued PRs)` : ""}`;
         await markBatched(queued, job.id);
         await postComment(instId, repo, prNumber, withNote(`**Shiplog** is cutting **${v}** with a Cursor cloud agent. A release PR will follow.`));
       } else {
-        job.result = releasePrompt(repo, v, today(), cfg);
+        job.result = releasePrompt(repo, v, today(), cfg, releaseNoteExtras(cfg, v));
         await postComment(instId, repo, prNumber, withNote(fallbackComment(info, job.result, v)));
       }
     }

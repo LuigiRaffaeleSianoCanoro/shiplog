@@ -1,6 +1,6 @@
 # Progress and decision log
 
-Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR per item against `feat/mvp`.
+Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against `feat/mvp`.
 
 ## Decisions
 
@@ -31,6 +31,12 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR pe
 - 2026-10-15. Item 4. Batching applies only to Cursor agent mode. Prompt and Neon modes cost the key owner nothing, so they stay per PR.
 - 2026-10-15. Item 4. The dashboard shows agent runs per installation (last 30 days and total) and which key pays (personal or service account). Runs are counted from jobs with an agent id. Exact credit cost is not available from the Cursor API used here.
 
+- 2026-10-15. Item 8. No Neon AI Gateway from the Cloud Agent VM, so implement, test and review were done directly by the agent (same constraint as the global note above).
+- 2026-10-15. Item 8. Audience notes are opt-in via `.shiplog.yml` `notes.audiences` (`technical`, `customer`) and `notes.languages` (`en`, `es` only). Default is off so existing repos behave the same.
+- 2026-10-15. Item 8. Notes are generated on **release** (tag or `/shiplog release`), not on every merged PR, to avoid extra model or agent cost.
+- 2026-10-15. Item 8. Neon test mode stores JSON bundles with `putChangelog` under `owner/repo::notes::X.Y.Z` (reuses the changelog blob table, no Supabase migration). Agent mode writes `.shiplog/notes/<version>/<audience>.<lang>.md` per the release prompt.
+- 2026-10-15. Item 8. User-facing PR comments use `#### Technical (en)` headings and never the pipe character in generated copy.
+
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
@@ -40,5 +46,6 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR pe
 - Item 4. Run cost in money is not shown, only the run count.
 - Item 1. Move `docs/ci/ci.yml` to `.github/workflows/ci.yml` (needs a token with `workflow` scope, for example `gh auth refresh -s workflow`).
 
+- Item 8. Per-PR audience snippets (before release) and languages beyond en/es are not implemented.
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
 - Item 1. Enable secret scanning, push protection, Dependabot and private vulnerability reporting in GitHub settings. Add CODEOWNERS and issue templates.
