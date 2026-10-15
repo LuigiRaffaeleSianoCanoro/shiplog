@@ -1,6 +1,6 @@
 # Progress and decision log
 
-Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR per item against `feat/mvp`.
+Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 6). One small PR per item against `feat/mvp`.
 
 ## Decisions
 
@@ -30,6 +30,9 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR pe
 - 2026-10-15. Item 4. `batch: release` folds every queued PR into the release agent run, so a release costs one run total. `batch: daily` flushes from the existing daily Vercel cron (`/api/cron/poll`), one agent per repo. The dashboard view does not flush, so opening it never spends money.
 - 2026-10-15. Item 4. Batching applies only to Cursor agent mode. Prompt and Neon modes cost the key owner nothing, so they stay per PR.
 - 2026-10-15. Item 4. The dashboard shows agent runs per installation (last 30 days and total) and which key pays (personal or service account). Runs are counted from jobs with an agent id. Exact credit cost is not available from the Cursor API used here.
+- 2026-10-15. Item 6. Public changelog lives at `/{namespace}/{repo}` with `feed.xml` (RSS) and `feed.json`. Harbor styling is scoped to that route group so the marketing site stays unchanged.
+- 2026-10-15. Item 6. Pages read markdown from the existing store (`getChangelog`). Agent mode still edits `CHANGELOG.md` in the repo, so the public page reflects neon test mode and any release cuts that write to the store until a future sync from Origin is added.
+- 2026-10-15. Item 6. Only active installations with a matching `namespace` can be viewed. Disconnected installs return 404. Slug segments are restricted to safe characters.
 
 ## Left to do
 
@@ -40,5 +43,6 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR pe
 - Item 4. Run cost in money is not shown, only the run count.
 - Item 1. Move `docs/ci/ci.yml` to `.github/workflows/ci.yml` (needs a token with `workflow` scope, for example `gh auth refresh -s workflow`).
 
+- Item 6. Public page does not yet pull `CHANGELOG.md` from Origin for cursor or prompt mode installs. Luigi or a follow-up can add optional `.shiplog.yml` `public: true` plus Origin file fetch.
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
 - Item 1. Enable secret scanning, push protection, Dependabot and private vulnerability reporting in GitHub settings. Add CODEOWNERS and issue templates.
