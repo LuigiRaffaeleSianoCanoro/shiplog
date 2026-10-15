@@ -31,7 +31,12 @@ tone: concise, user-facing
 changelog: CHANGELOG.md
 mode: agent          # or "prompt": never launch an agent, post a ready-to-run prompt instead
 batch: off           # "release": one agent per release; "daily": one agent per repo per day (cron)
+notify:
+  webhooks:          # optional HTTPS URLs (Slack, Discord, or generic JSON POST)
+    - https://hooks.slack.com/services/…
 ```
+
+Installation-wide webhooks can also be set on `/setup` (same session as the Cursor key). Shiplog POSTs on changelog entries and releases; failures are logged only.
 
 ## PR commands
 

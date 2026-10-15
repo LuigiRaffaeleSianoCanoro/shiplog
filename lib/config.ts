@@ -13,6 +13,8 @@ export interface ShiplogConfig {
   mode: ConfigMode;
   /** Agent cost control: "release" or "daily" queue merged PRs and launch one agent per batch. */
   batch: BatchMode;
+  /** Optional outbound webhook URLs (Slack incoming, Discord, or generic HTTPS POST). */
+  notify: { webhooks: string[] };
 }
 export type BatchMode = "off" | "release" | "daily";
 
@@ -20,6 +22,7 @@ export const CONFIG_PATH = ".shiplog.yml";
 export const DEFAULT_CONFIG: ShiplogConfig = {
   sections: {}, exclude: { labels: ["skip-changelog"], authors: [] },
   language: "en", tone: "concise, user-facing", changelogPath: "CHANGELOG.md", mode: "agent", batch: "off",
+  notify: { webhooks: [] },
 };
 
 const str = (v: unknown, max = 80) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
@@ -43,6 +46,7 @@ export function parseConfig(text: string | null): ShiplogConfig {
     changelogPath: safePath(raw.changelog) ?? DEFAULT_CONFIG.changelogPath,
     mode: raw.mode === "prompt" ? "prompt" : "agent",
     batch: raw.batch === "release" || raw.batch === "daily" ? raw.batch : "off",
+    notify: { webhooks: strList(raw.notify?.webhooks) ?? [] },
   };
 }
 
