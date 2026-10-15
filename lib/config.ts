@@ -14,17 +14,26 @@ export interface ShiplogConfig {
   mode: ConfigMode;
   /** Agent cost control: "release" or "daily" queue merged PRs and launch one agent per batch. */
   batch: BatchMode;
+  /** Initial changelog backfill from merged PRs and tags (install time). */
+  history: HistoryConfig;
   /** Optional per-audience release notes (technical and customer) with en/es output. */
   notes: { audiences: NoteAudience[]; languages: NoteLanguage[] };
   /** Optional outbound webhook URLs (Slack incoming, Discord, or generic HTTPS POST). */
   notify: { webhooks: string[] };
 }
 export type BatchMode = "off" | "release" | "daily";
+export interface HistoryConfig {
+  enabled: boolean;
+  maxPrs: number;
+  maxTags: number;
+}
 
 export const CONFIG_PATH = ".shiplog.yml";
+export const DEFAULT_HISTORY: HistoryConfig = { enabled: true, maxPrs: 100, maxTags: 50 };
 export const DEFAULT_CONFIG: ShiplogConfig = {
   sections: {}, exclude: { labels: ["skip-changelog"], authors: [] },
   language: "en", tone: "concise, user-facing", changelogPath: "CHANGELOG.md", mode: "agent", batch: "off",
+  history: DEFAULT_HISTORY,
   notes: { audiences: [], languages: ["en", "es"] },
   notify: { webhooks: [] },
 };
@@ -32,6 +41,11 @@ export const DEFAULT_CONFIG: ShiplogConfig = {
 const str = (v: unknown, max = 80) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
 const strList = (v: unknown) => (Array.isArray(v) ? v.map((x) => str(x)).filter((x): x is string => !!x) : null);
 const safePath = (v: unknown) => { const p = str(v, 200); return p && /^[\w./-]+\.md$/i.test(p) && !p.split("/").includes("..") && !p.startsWith("/") ? p : null; };
+const posInt = (v: unknown, max: number, fallback: number) => {
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return Math.min(Math.floor(n), max);
+};
 
 /** Parse .shiplog.yml text. Repo content is untrusted: unknown keys and bad values fall back to defaults. */
 export function parseConfig(text: string | null): ShiplogConfig {
@@ -50,6 +64,11 @@ export function parseConfig(text: string | null): ShiplogConfig {
     changelogPath: safePath(raw.changelog) ?? DEFAULT_CONFIG.changelogPath,
     mode: raw.mode === "prompt" ? "prompt" : "agent",
     batch: raw.batch === "release" || raw.batch === "daily" ? raw.batch : "off",
+    history: {
+      enabled: raw.history?.enabled === false ? false : DEFAULT_HISTORY.enabled,
+      maxPrs: posInt(raw.history?.maxPrs ?? raw.history?.max_prs, 500, DEFAULT_HISTORY.maxPrs),
+      maxTags: posInt(raw.history?.maxTags ?? raw.history?.max_tags, 200, DEFAULT_HISTORY.maxTags),
+    },
     notes: {
       audiences: parseNoteAudiences(raw.notes?.audiences),
       languages: parseNoteLanguages(raw.notes?.languages),

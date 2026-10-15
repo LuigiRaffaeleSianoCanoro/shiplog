@@ -4,6 +4,8 @@ export type InstallStatus = "active" | "suspended" | "disconnected";
 export interface Installation {
   id: string; namespace: string; status: InstallStatus; createdAt: string; disconnectedAt?: string | null;
   installerId?: string | null; namespaceType?: "user" | "team" | null;
+  /** Per-repo backfill marker (ISO timestamp or skipped:reason:time). */
+  historyBackfillAt?: Record<string, string>;
   /** Installation-wide outbound notify webhooks (Slack, Discord, generic HTTPS). */
   notifyWebhooks?: string[];
 }
