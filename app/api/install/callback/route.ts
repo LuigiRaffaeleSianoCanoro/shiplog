@@ -31,7 +31,7 @@ export async function GET(req: Request) {
         namespace = namespace || info.namespace; namespaceType = namespaceType ?? info.namespaceType; installerId = installerId ?? info.installerId;
       } catch (e) { console.error("[shiplog] installation lookup failed:", (e as Error).message); }
     }
-    await store.upsertInstallation({ ...existing, id: r.sub, namespace, namespaceType, status: "active", createdAt: existing?.createdAt ?? new Date().toISOString(), disconnectedAt: null, installerId });
+    await store.upsertInstallation({ ...existing, id: r.sub, provider: "origin", namespace, namespaceType, status: "active", createdAt: existing?.createdAt ?? new Date().toISOString(), disconnectedAt: null, installerId });
     const res = NextResponse.redirect(new URL(`/setup?installation_id=${encodeURIComponent(r.sub)}`, url.origin));
     res.cookies.set(COOKIE, signSession(r.sub), { httpOnly: true, secure: url.protocol === "https:", sameSite: "lax", path: "/", maxAge: 3600 });
     res.cookies.set("shiplog_state", "", { path: "/api/install", maxAge: 0 });

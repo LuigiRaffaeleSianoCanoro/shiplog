@@ -1,6 +1,6 @@
 # ADR 0012: GitHub App install path (roadmap item 12)
 
-**Status:** Accepted (direction locked, not implemented)
+**Status:** Accepted (first slice: webhook + install path shipped)
 
 **Date:** 2026-10-15
 
@@ -23,18 +23,18 @@ Roadmap item 12 asked for product direction: scope, hosting, and how a GitHub pa
 
 | Area | Choice |
 |------|--------|
-| Hosting | Same hosted Shiplog deploy on Vercel; same app, same environment. New webhook route: `/api/webhooks/github` (handler implementation is a follow-up PR; optional route stub only if it helps docs). |
+| Hosting | Same hosted Shiplog deploy on Vercel; same app, same environment. Webhook route: `POST /api/webhooks/github` with HMAC verification and adapter into the shared core. |
 | Events | `pull_request` (merged); `issue_comment` or `pull_request_review_comment` for `/shiplog` commands; `push` for tags when GitHub delivers them. |
 | Core engine | Reuse the existing changelog pipeline (classify, batch, notes, notify, public pages, read API and MCP) behind a **thin adapter** so Origin and GitHub share one core. |
 | Install records | Dual install is allowed. Installation records distinguish `provider=origin` and `provider=github`. Uninstall is independent per provider. |
 | Credentials | Separate GitHub App env vars: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`. Never invent or commit secrets. |
 | BYOK / LLM | For GitHub-only repos, prefer an OpenAI-compatible or Neon-style key path (or prompt-only fallback). **Cursor Cloud Agents** are Origin-first: use agent mode on GitHub only when the repo is also reachable by Cursor (same constraints as today). Do not assume agents can run on arbitrary GitHub-only repos. |
 
-### Explicitly out of scope for the first slice (and for this documentation PR)
+### Explicitly out of scope for v1 (follow-up PRs)
 
 - Paid hosted plan (roadmap item 16)
 - In-app changelog widget (roadmap item 15)
-- Full GitHub App binary implementation (webhook verification, install flow, GitHub API client)
+- GitHub API client for PR comments, file reads, and permission checks (webhook + install persistence only in the first slice)
 - GitHub Marketplace listing for the app
 
 ## Consequences
@@ -51,11 +51,11 @@ Roadmap item 12 asked for product direction: scope, hosting, and how a GitHub pa
 - Installation and dashboard UX must show provider and avoid conflating uninstall or keys across providers.
 - Agent mode on GitHub-only repos is limited unless Cursor can reach the repo; prompt-only or BYOK LLM paths are the default expectation for v1.
 
-**Follow-up work (not this PR)**
+**Follow-up work**
 
-- Implement `/api/webhooks/github` with GitHub signature verification and event routing into the shared core adapter.
-- GitHub App install OAuth or manifest flow, `provider=github` persistence (store shape TBD in a small implementation PR).
-- Document GitHub App permissions and events alongside [docs/self-host.md](../self-host.md) when implementation lands.
+- GitHub REST client for comments, contents, and collaborator permission checks on `provider=github` installs.
+- Dashboard and setup UX that surfaces provider and links to both install paths.
+- Document GitHub App permissions and events alongside [docs/self-host.md](../self-host.md) (partial notes in self-host today).
 
 ## References
 
