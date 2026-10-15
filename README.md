@@ -7,7 +7,7 @@ AI changelog & release notes for **Cursor Origin**. An Origin App that turns eac
 |---|---|---|
 | Install | redirect to `/api/install/callback?installation_receipt=<JWT>` + `installation.created` | Verifies the receipt (EdDSA, `typ origin-installation-receipt+jwt`, iss/aud/exp via JWKS), reads the installation id from `sub`, sets a signed session cookie, sends you to `/setup` |
 | PR merged | `pull_request.merged` | Classifies the title (feat→Added, fix→Fixed…) and drafts the entry |
-| Version tag | `repository.pushed` with `refUpdates[].ref` = `refs/tags/vX.Y.Z` | Moves Unreleased into `## [X.Y.Z] - YYYY-MM-DD` with a summary. **Native Origin repos only**: Origin does not deliver `repository.pushed` for GitHub-mirrored repos |
+| Version tag | `repository.pushed` with `refUpdates[].ref` = `refs/tags/vX.Y.Z` | Moves Unreleased into `## [X.Y.Z] - YYYY-MM-DD` with a summary. **Native Origin repos only**: Origin does not deliver `repository.pushed` for GitHub-mirrored repos. Planned GitHub App path (tag `push` on GitHub): [docs/adr/0012-github-app.md](docs/adr/0012-github-app.md) |
 | PR comment | `pull_request.comment.created` with `/shiplog release vX.Y.Z` | Same as a tag (works on mirrored repos too) |
 | Uninstall | `installation.deleted` | Marks the installation Disconnected, deletes the key, ignores later webhooks |
 
@@ -116,7 +116,7 @@ The `no-changelog` label always skips a PR, as does any label in `exclude.labels
 
 Pull requests and pushes to `main` or `feat/mvp` run CI (`.github/workflows/ci.yml`): `npm ci`, `npx tsc --noEmit`, `npm test`, `npm run build`, and a gitleaks secret scan. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Project docs: [ROADMAP.md](ROADMAP.md) (public priorities on `feat/mvp`) and [TRADEMARKS.md](TRADEMARKS.md) (name and logo policy). Decision log: [PROGRESS.md](PROGRESS.md).
+Project docs: [ROADMAP.md](ROADMAP.md) (public priorities on `feat/mvp`) and [TRADEMARKS.md](TRADEMARKS.md) (name and logo policy). Decision log: [PROGRESS.md](PROGRESS.md). GitHub App direction (roadmap item 12, not built yet): [docs/adr/0012-github-app.md](docs/adr/0012-github-app.md).
 
 ## Security
 - Webhooks: Origin `v1ed` scheme. Ed25519 over lowercase-hex SHA-256 of `"<webhook-id>.<webhook-timestamp>.<raw body>"`, checked against the JWKS (cached 10 min, refreshed on an unknown key), with a ±5 min window and dedupe on `webhook-id`. The receiver returns 202 and does the work in `after()`.

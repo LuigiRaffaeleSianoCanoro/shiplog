@@ -79,6 +79,8 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 
 - 2026-10-15. OSS docs hygiene (strategy 4.1 and 4.7). Added [TRADEMARKS.md](TRADEMARKS.md) (names Shiplog, Harbor, sail mark, brand colors; Apache-2.0 does not grant trademark use) and [ROADMAP.md](ROADMAP.md) (items 1–11, 13, 14 and monetization badge or FUNDING marked done on `feat/mvp`; 12, 15, 16 later). Linked both from README Contributing. No Neon AI Gateway on the build box; `npm test` run on the agent VM only.
 
+- 2026-10-15. Item 12 (direction). Origin App stays primary. A separate GitHub App install path covers GitHub-native and GitHub-mirrored repos where Origin does not deliver `repository.pushed`. Same Vercel host, new route `/api/webhooks/github`, env `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`. Shared changelog core (classify, batch, notes, notify, public pages, read API and MCP) behind a thin provider adapter. Installations record `provider=origin` or `provider=github`; dual install and independent uninstall. v1 GitHub events: merged `pull_request`, `/shiplog` via `issue_comment` or `pull_request_review_comment`, tag `push` when available. GitHub-only BYOK uses OpenAI-compatible or Neon-style keys or prompt-only; Cursor agent mode is Origin-first and on GitHub only when Cursor can reach the repo. Out of scope for first slice: items 15–16, full webhook or install implementation, GitHub Marketplace listing. ADR: [docs/adr/0012-github-app.md](docs/adr/0012-github-app.md).
+
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
@@ -95,5 +97,6 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - Item 6. Public page does not yet pull `CHANGELOG.md` from Origin for cursor or prompt mode installs. Luigi or a follow-up can add optional `.shiplog.yml` `public: true` plus Origin file fetch.
 - Item 8. Per-PR audience snippets (before release) and languages beyond en/es are not implemented.
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
+- Item 12. Implement GitHub App webhook and install flow per [docs/adr/0012-github-app.md](docs/adr/0012-github-app.md) (direction locked; build not started).
 - Item 7. Email notifications are out of scope (webhook-only per roadmap). Retry/backoff for failed webhooks is not implemented.
 - Item 14. MCP has no OAuth or per-repo URL tokens (public read only). Optional API rate limiting and OpenAPI export are not implemented.
