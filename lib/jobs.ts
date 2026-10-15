@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { env } from "./env";
 import { getStore, type Job, type JobMode } from "./store";
-import { addEntry, changelogPrompt, classify, cutRelease, parseReleaseCommand, releasePrompt, tagsFromPush, unreleased, type PrInfo } from "./changelog";
+import { addEntry, changelogPrompt, cutRelease, parseReleaseCommand, releasePrompt, tagsFromPush, unreleased, type PrInfo } from "./changelog";
 import { draftEntry, draftSummary } from "./llm";
 import { getRun, launchAgent } from "./cursor";
 import { open, parseMasterKey } from "./crypto";
-import { commentOnPr, getInstallationInfo, originConfigured, repoPermission } from "./origin";
+import { commentOnPr, getInstallationInfo, getRepoFile, originConfigured, repoPermission } from "./origin";
+import { CONFIG_PATH, DEFAULT_CONFIG, excludedBy, parseConfig, sectionFor, type ShiplogConfig } from "./config";
 
 export interface Envelope {
   deliveryId?: string; installationId: string;
@@ -60,6 +61,13 @@ export async function pickMode(installationId: string): Promise<{ mode: JobMode;
   if (env.llmProvider === "neon") return { mode: "neon" };
   const key = await userKey(installationId);
   return key ? { mode: "cursor", key } : { mode: "fallback" };
+}
+
+/** The repo's .shiplog.yml, or defaults when Origin is not configured or the file is missing. */
+async function loadConfig(installationId: string, repo: string): Promise<ShiplogConfig> {
+  if (!originConfigured()) return DEFAULT_CONFIG;
+  try { return parseConfig(await getRepoFile(installationId, repo, CONFIG_PATH)); }
+  catch (e) { console.error("[shiplog] config load failed:", (e as Error).message); return DEFAULT_CONFIG; }
 }
 
 // pull_request.comment.created carries the repo only under pullRequest.repository.
@@ -122,25 +130,29 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
 
   const prNumber = String(pr?.number ?? payload?.pullRequest?.number ?? "");
   const info: PrInfo = { repo, number: prNumber, title: pr?.title ?? "", body: pr?.body ?? "", url: pr?.webUrl ?? (prNumber ? `${repoUrl(repo)}/pull/${prNumber}` : repoUrl(repo)) };
-  const { mode, key } = await pickMode(instId);
+  const cfg = await loadConfig(instId, repo);
+  const picked = await pickMode(instId);
+  const { mode, key } = cfg.mode === "prompt" && picked.mode === "cursor" ? { mode: "fallback" as const, key: undefined } : picked;
   const job: Job = { id: randomUUID(), deliveryId, installationId: instId, repo, prNumber, prUrl: info.url, kind, mode, status: "running", createdAt: now };
+  const skip = kind === "changelog" ? excludedBy(pr, cfg) : null;
+  if (skip) { job.status = "ignored"; job.result = `excluded by ${skip}`; await store.putJob(job); return job; }
   await store.putJob(job);
 
   try {
     if (kind === "changelog") {
-      const hint = classify(info.title);
+      const hint = sectionFor(info.title, cfg);
       if (mode === "neon") {
-        const { section, bullet } = await draftEntry(info, hint);
+        const { section, bullet } = await draftEntry(info, hint, undefined, cfg);
         const md = addEntry(await store.getChangelog(repo), section, bullet);
         await store.putChangelog(repo, md);
         job.result = `### ${section}\n- ${bullet}`;
         await postComment(instId, repo, prNumber, `**Shiplog** drafted a changelog entry for this PR:\n\n\`\`\`md\n## [Unreleased]\n\n${job.result}\n\`\`\`\n\n<sub>Test mode (direct model draft). Comment \`/shiplog release vX.Y.Z\` to cut release notes.</sub>`);
       } else if (mode === "cursor") {
-        const l = await launchAgent(key!, changelogPrompt(info, hint), repoUrl(repo));
+        const l = await launchAgent(key!, changelogPrompt(info, hint, cfg), repoUrl(repo));
         job.agentId = l.agentId; job.runId = l.runId; job.result = `agent ${l.agentId}`;
-        await postComment(instId, repo, prNumber, `**Shiplog** is drafting the changelog entry with a Cursor cloud agent on your plan. A PR updating \`CHANGELOG.md\` will follow.`);
+        await postComment(instId, repo, prNumber, `**Shiplog** is drafting the changelog entry with a Cursor cloud agent on your plan. A PR updating \`${cfg.changelogPath}\` will follow.`);
       } else {
-        job.result = changelogPrompt(info, hint);
+        job.result = changelogPrompt(info, hint, cfg);
         await postComment(instId, repo, prNumber, fallbackComment(info, job.result));
       }
     } else {
@@ -154,11 +166,11 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
         job.result = `## [${v.replace(/^v/, "")}] - ${today()}\n\n${summary}\n\n${notes}`;
         await postComment(instId, repo, prNumber, `**Shiplog** release notes for **${v}**:\n\n\`\`\`md\n${job.result}\n\`\`\``);
       } else if (mode === "cursor") {
-        const l = await launchAgent(key!, releasePrompt(repo, v, today()), repoUrl(repo));
+        const l = await launchAgent(key!, releasePrompt(repo, v, today(), cfg), repoUrl(repo));
         job.agentId = l.agentId; job.runId = l.runId; job.result = `agent ${l.agentId}`;
         await postComment(instId, repo, prNumber, `**Shiplog** is cutting **${v}** with a Cursor cloud agent. A release PR will follow.`);
       } else {
-        job.result = releasePrompt(repo, v, today());
+        job.result = releasePrompt(repo, v, today(), cfg);
         await postComment(instId, repo, prNumber, fallbackComment(info, job.result, v));
       }
     }

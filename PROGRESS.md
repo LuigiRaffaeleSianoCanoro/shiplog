@@ -10,9 +10,15 @@ Roadmap source: shiplog-estrategia.md, section 3 (items 1 to 5). One small PR pe
 - 2026-10-15. Item 1. Vulnerability reports go through GitHub private vulnerability reporting. It must be enabled once in repo settings (Security, Private vulnerability reporting).
 
 - 2026-10-15. Item 1. The push token has no `workflow` scope, so GitHub refused `.github/workflows/ci.yml`. The workflow ships at `docs/ci/ci.yml`. Activating it is one move (`git mv docs/ci/ci.yml .github/workflows/ci.yml`) by someone whose token has that scope. Routing around the scope was not attempted.
+- 2026-10-15. Item 2. Config is read from `.shiplog.yml` on the default branch through the Origin Get Contents API (scope `repository:contents:read`, already requested). Without Origin credentials (local, tests) the defaults apply.
+- 2026-10-15. Item 2. Parsed with the `yaml` package (free, no deps) rather than a hand-written parser. Repo content is untrusted, so unknown sections, bad modes and paths with `..` or absolute paths fall back to defaults.
+- 2026-10-15. Item 2. Excluded PRs are recorded as `ignored` jobs with the reason and get no comment, to keep PRs quiet. Default exclude label is `skip-changelog`.
+- 2026-10-15. Item 2. `mode: prompt` downgrades only the Cursor agent mode to the prompt fallback. Neon test mode is left alone because it is an operator switch.
+- 2026-10-15. Item 2. Config is loaded once per event, no caching. One extra Origin read per event is cheap and avoids stale config.
 
 ## Left to do
 
+- Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
 - Item 1. Move `docs/ci/ci.yml` to `.github/workflows/ci.yml` (needs a token with `workflow` scope, for example `gh auth refresh -s workflow`).
 
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).

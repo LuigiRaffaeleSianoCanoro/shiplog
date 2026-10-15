@@ -16,6 +16,22 @@ AI changelog & release notes for **Cursor Origin**. An Origin App that turns eac
 2. **No key (fallback).** Shiplog posts a PR comment with a ready-to-run prompt; this costs $0 of anyone's LLM. `SHIPLOG_BYOK_ENABLED=false` forces this mode for everyone.
 3. **Test mode** (`SHIPLOG_LLM_PROVIDER=neon`). Shiplog drafts entries and notes directly through an OpenAI-compatible gateway (Neon AI Gateway, `claude-opus-5-5`) and keeps the changelog in storage. This is for end-to-end testing without Cursor keys.
 
+## Per-repo config (.shiplog.yml)
+
+Optional. Put it at the repo root (default branch). Every key is optional; bad values fall back to defaults.
+
+```yaml
+sections:            # extra prefix to section mappings (Added, Changed, Deprecated, Removed, Fixed, Security)
+  deps: Security
+exclude:
+  labels: [skip-changelog]          # default
+  authors: [dependabot, "renovate*", bots]   # "bots" matches any app or service account
+language: en
+tone: concise, user-facing
+changelog: CHANGELOG.md
+mode: agent          # or "prompt": never launch an agent, post a ready-to-run prompt instead
+```
+
 ## Security
 - Webhooks: Origin `v1ed` scheme. Ed25519 over lowercase-hex SHA-256 of `"<webhook-id>.<webhook-timestamp>.<raw body>"`, checked against the JWKS (cached 10 min, refreshed on an unknown key), with a ±5 min window and dedupe on `webhook-id`. The receiver returns 202 and does the work in `after()`.
 - Keys: AES-256-GCM, random 12-byte IV per record, installation id bound as AAD, `key_version` for rotation. Only the last 4 characters are shown and keys are never logged. Setting or removing a key requires the session cookie issued by a verified install receipt.
