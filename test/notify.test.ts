@@ -30,6 +30,13 @@ describe("notify webhook URLs", () => {
     expect(isValidNotifyWebhookUrl("")).toBe(false);
   });
 
+  it("allows loopback http when SHIPLOG_ALLOW_HTTP_NOTIFY is set", () => {
+    process.env.SHIPLOG_ALLOW_HTTP_NOTIFY = "true";
+    expect(isValidNotifyWebhookUrl("http://127.0.0.1:4567/notify/capture")).toBe(true);
+    expect(isValidNotifyWebhookUrl("http://evil.com/hook")).toBe(false);
+    delete process.env.SHIPLOG_ALLOW_HTTP_NOTIFY;
+  });
+
   it("classifies provider from host", () => {
     expect(classifyWebhookUrl("https://hooks.slack.com/services/x")).toBe("slack");
     expect(classifyWebhookUrl("https://discord.com/api/webhooks/1/x")).toBe("discord");

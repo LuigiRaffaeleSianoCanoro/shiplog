@@ -90,9 +90,11 @@ Users can install with `https://<your-host>/api/github/install/start` (same `SHI
 - `SHIPLOG_DASHBOARD_TOKEN` — if set, the all-installations dashboard requires `?token=` or a `Authorization: Bearer` header with this value.
 - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` — use Supabase instead of Blob if you prefer (see `supabase/migrations/0001_shiplog.sql`). Not required when Blob is connected.
 - `ORIGIN_API_BASE` — override Origin API base (default `https://api.cursor.com/v1/origin`).
+- `GITHUB_API_BASE` — override GitHub REST API host (default `https://api.github.com`). Used by local Playwright e2e mocks only.
 - `CURSOR_API_BASE` — override Cursor API base (default `https://api.cursor.com`).
 - `ORIGIN_JWKS_URL` — override JWKS URL for webhook verification (default production Cursor JWKS). Local tests only.
 - `SHIPLOG_INSECURE_WEBHOOKS` — `true` skips webhook signatures when `NODE_ENV` is not `production`. **Never set on Vercel production.**
+- `SHIPLOG_ALLOW_HTTP_NOTIFY` — `true` allows `http://127.0.0.1` or `http://localhost` notify URLs (Playwright e2e and local dev only). Production still requires `https:`.
 
 ### Local development only
 

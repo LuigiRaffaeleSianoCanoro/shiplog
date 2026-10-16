@@ -1,3 +1,4 @@
+import { env } from "./env";
 import { githubAppJwt, githubConfigured } from "./github";
 import type { HistoricalPr, HistoricalTag } from "./history";
 import { compareSemverTags } from "./history";
@@ -5,7 +6,7 @@ import type { PrComment } from "./origin";
 
 export { githubConfigured };
 
-const API = "https://api.github.com";
+const apiBase = () => env.githubApi.replace(/\/+$/, "");
 
 const tokenCache = new Map<string, { token: string; exp: number }>();
 
@@ -13,7 +14,7 @@ const tokenCache = new Map<string, { token: string; exp: number }>();
 export async function githubInstallationToken(installationId: string): Promise<string> {
   const cached = tokenCache.get(installationId);
   if (cached && cached.exp > Date.now() + 60_000) return cached.token;
-  const r = await fetch(`${API}/app/installations/${encodeURIComponent(installationId)}/access_tokens`, {
+  const r = await fetch(`${apiBase()}/app/installations/${encodeURIComponent(installationId)}/access_tokens`, {
     method: "POST",
     headers: { Authorization: `Bearer ${githubAppJwt()}`, Accept: "application/vnd.github+json" },
     body: "{}",
@@ -42,7 +43,7 @@ const ghHeaders = (token: string) => ({
 export async function githubCommentOnPr(installationId: string, repo: string, prNumber: string, body: string) {
   const { owner, name } = repoParts(repo);
   const token = await githubInstallationToken(installationId);
-  const r = await fetch(`${API}/repos/${owner}/${name}/issues/${encodeURIComponent(prNumber)}/comments`, {
+  const r = await fetch(`${apiBase()}/repos/${owner}/${name}/issues/${encodeURIComponent(prNumber)}/comments`, {
     method: "POST",
     headers: { ...ghHeaders(token), "content-type": "application/json" },
     body: JSON.stringify({ body }),
@@ -52,7 +53,7 @@ export async function githubCommentOnPr(installationId: string, repo: string, pr
 
 async function resolveLogin(userId: string, login?: string): Promise<string | null> {
   if (login) return login;
-  const r = await fetch(`${API}/user/${encodeURIComponent(userId)}`, {
+  const r = await fetch(`${apiBase()}/user/${encodeURIComponent(userId)}`, {
     headers: ghHeaders(githubAppJwt()),
     cache: "no-store",
   });
@@ -80,7 +81,7 @@ export async function githubRepoPermission(
   const { owner, name } = repoParts(repo);
   const token = await githubInstallationToken(installationId);
   const r = await fetch(
-    `${API}/repos/${owner}/${name}/collaborators/${encodeURIComponent(username)}/permission`,
+    `${apiBase()}/repos/${owner}/${name}/collaborators/${encodeURIComponent(username)}/permission`,
     { headers: ghHeaders(token), cache: "no-store" },
   );
   if (!r.ok) return null;
@@ -91,7 +92,7 @@ export async function githubRepoPermission(
 export async function githubGetRepoFile(installationId: string, repo: string, path: string): Promise<string | null> {
   const { owner, name } = repoParts(repo);
   const token = await githubInstallationToken(installationId);
-  const r = await fetch(`${API}/repos/${owner}/${name}/contents/${encodeURIComponent(path)}`, {
+  const r = await fetch(`${apiBase()}/repos/${owner}/${name}/contents/${encodeURIComponent(path)}`, {
     headers: ghHeaders(token),
     cache: "no-store",
   });
@@ -109,7 +110,7 @@ export async function githubListPrFiles(installationId: string, repo: string, pr
   const out: string[] = [];
   for (let page = 1; page <= 3 && out.length < 300; page++) {
     const r = await fetch(
-      `${API}/repos/${owner}/${name}/pulls/${encodeURIComponent(prNumber)}/files?per_page=100&page=${page}`,
+      `${apiBase()}/repos/${owner}/${name}/pulls/${encodeURIComponent(prNumber)}/files?per_page=100&page=${page}`,
       { headers: ghHeaders(token), cache: "no-store" },
     );
     if (!r.ok) throw new Error(`github pr files ${r.status}`);
@@ -142,7 +143,7 @@ export async function githubListPrComments(installationId: string, repo: string,
 
   for (let page = 1; page <= 5; page++) {
     const r = await fetch(
-      `${API}/repos/${owner}/${name}/issues/${encodeURIComponent(prNumber)}/comments?per_page=100&page=${page}`,
+      `${apiBase()}/repos/${owner}/${name}/issues/${encodeURIComponent(prNumber)}/comments?per_page=100&page=${page}`,
       { headers, cache: "no-store" },
     );
     if (!r.ok) throw new Error(`github issue comments ${r.status}`);
@@ -156,7 +157,7 @@ export async function githubListPrComments(installationId: string, repo: string,
 
   for (let page = 1; page <= 5; page++) {
     const r = await fetch(
-      `${API}/repos/${owner}/${name}/pulls/${encodeURIComponent(prNumber)}/comments?per_page=100&page=${page}`,
+      `${apiBase()}/repos/${owner}/${name}/pulls/${encodeURIComponent(prNumber)}/comments?per_page=100&page=${page}`,
       { headers, cache: "no-store" },
     );
     if (!r.ok) throw new Error(`github review comments ${r.status}`);
@@ -177,7 +178,7 @@ export async function githubListInstallationRepos(installationId: string): Promi
   const token = await githubInstallationToken(installationId);
   const out: string[] = [];
   for (let page = 1; page <= 20; page++) {
-    const r = await fetch(`${API}/installation/repositories?per_page=100&page=${page}`, {
+    const r = await fetch(`${apiBase()}/installation/repositories?per_page=100&page=${page}`, {
       headers: ghHeaders(token),
       cache: "no-store",
     });
@@ -199,7 +200,7 @@ export async function githubListMergedPullRequests(installationId: string, repo:
   const out: HistoricalPr[] = [];
   for (let page = 1; out.length < max; page++) {
     const r = await fetch(
-      `${API}/repos/${owner}/${name}/pulls?state=closed&sort=updated&direction=desc&per_page=${Math.min(100, max - out.length)}&page=${page}`,
+      `${apiBase()}/repos/${owner}/${name}/pulls?state=closed&sort=updated&direction=desc&per_page=${Math.min(100, max - out.length)}&page=${page}`,
       { headers: ghHeaders(token), cache: "no-store" },
     );
     if (!r.ok) throw new Error(`github pulls ${r.status}`);
@@ -234,7 +235,7 @@ const semverTag = /^v?\d+\.\d+\.\d+(?:-[\w.]+)?$/;
 export async function githubListSemverTags(installationId: string, repo: string, maxTags = 50): Promise<HistoricalTag[]> {
   const { owner, name } = repoParts(repo);
   const token = await githubInstallationToken(installationId);
-  const r = await fetch(`${API}/repos/${owner}/${name}/tags?per_page=100`, { headers: ghHeaders(token), cache: "no-store" });
+  const r = await fetch(`${apiBase()}/repos/${owner}/${name}/tags?per_page=100`, { headers: ghHeaders(token), cache: "no-store" });
   if (!r.ok) throw new Error(`github tags ${r.status}`);
   const tags = (await r.json()) as { name?: string; commit?: { sha?: string; url?: string } }[];
   const semver = tags
@@ -247,7 +248,7 @@ export async function githubListSemverTags(installationId: string, repo: string,
     let at = new Date().toISOString();
     if (t.sha) {
       try {
-        const cr = await fetch(`${API}/repos/${owner}/${name}/commits/${t.sha}`, { headers: ghHeaders(token), cache: "no-store" });
+        const cr = await fetch(`${apiBase()}/repos/${owner}/${name}/commits/${t.sha}`, { headers: ghHeaders(token), cache: "no-store" });
         if (cr.ok) {
           const cj = (await cr.json()) as { commit?: { committer?: { date?: string }; author?: { date?: string } } };
           at = cj.commit?.committer?.date ?? cj.commit?.author?.date ?? at;
@@ -271,7 +272,7 @@ export async function githubCommitChangelogFile(
   const token = await githubInstallationToken(installationId);
   const headers = { ...ghHeaders(token), "content-type": "application/json" };
   let sha: string | undefined;
-  const existing = await fetch(`${API}/repos/${owner}/${name}/contents/${encodeURIComponent(path)}`, {
+  const existing = await fetch(`${apiBase()}/repos/${owner}/${name}/contents/${encodeURIComponent(path)}`, {
     headers: ghHeaders(token),
     cache: "no-store",
   });
@@ -284,7 +285,7 @@ export async function githubCommitChangelogFile(
     content: Buffer.from(content, "utf8").toString("base64"),
     ...(sha ? { sha } : {}),
   };
-  const r = await fetch(`${API}/repos/${owner}/${name}/contents/${encodeURIComponent(path)}`, {
+  const r = await fetch(`${apiBase()}/repos/${owner}/${name}/contents/${encodeURIComponent(path)}`, {
     method: "PUT",
     headers,
     body: JSON.stringify(body),

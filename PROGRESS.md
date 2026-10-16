@@ -85,6 +85,8 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 
 - 2026-10-16. Item 12 (second slice). Added `lib/github-api.ts` (GitHub App JWT, installation access token cache, PR issue comments, contents read, PR files, merged PR and tag history, collaborator permission mapping) and `lib/vcs.ts` to route changelog pipeline calls by `provider`. `jobs.ts`, `repo-config.ts`, and `backfill.ts` use the VCS facade so GitHub-only installs post acknowledgements, prompt fallbacks, and permission refusals without Origin credentials. Setup and dashboard show provider badges, dual install links, and provider-specific uninstall copy. Documented GitHub App permissions in `docs/self-host.md`. Tests: `github-api.test.ts`, `vcs-provider.test.ts`, `github-vcs-jobs.test.ts`. No Supabase migration. Origin behavior unchanged when `provider=origin`.
 
+- 2026-10-16. Playwright e2e (pre-merge `feat/mvp`). Added `npm run test:e2e`: `next build` + `next start` on port 3099, in-memory store via `SHIPLOG_DATA_FILE`, local mock server (Origin JWKS + REST, GitHub REST, Neon chat, notify capture) with signed Origin and GitHub webhooks. `GITHUB_API_BASE` env routes GitHub App HTTP calls to the mock. `SHIPLOG_ALLOW_HTTP_NOTIFY=true` in e2e only so loopback notify URLs validate (production still requires `https:`). Vitest excludes `e2e/` so Playwright specs are not double-run. CI job `e2e` uploads `e2e/artifacts/*.png` screenshots. Bugs fixed while wiring tests: session cookie name is `shiplog_inst` (helpers initially used the wrong name); notify rejected `http://127.0.0.1` without the new flag.
+
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
