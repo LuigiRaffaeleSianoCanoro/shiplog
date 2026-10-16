@@ -14,6 +14,8 @@ export const env = {
   githubAppPrivateKey: unset(process.env.GITHUB_APP_PRIVATE_KEY).replace(/\\n/g, "\n"),
   githubWebhookSecret: unset(process.env.GITHUB_WEBHOOK_SECRET),
   originApi: process.env.ORIGIN_API_BASE ?? "https://api.cursor.com/v1/origin",
+  /** Override for local e2e mocks (default GitHub REST host). */
+  githubApi: process.env.GITHUB_API_BASE ?? "https://api.github.com",
   cursorApi: process.env.CURSOR_API_BASE ?? "https://api.cursor.com",
   neonBase: process.env.NEON_AI_GATEWAY_BASE_URL ?? "",
   neonToken: process.env.NEON_AI_GATEWAY_TOKEN ?? "",

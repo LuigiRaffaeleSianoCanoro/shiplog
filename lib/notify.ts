@@ -16,10 +16,19 @@ const HTTPS = /^https:\/\//i;
 
 export function isValidNotifyWebhookUrl(raw: string): boolean {
   const s = raw.trim();
-  if (!s || !HTTPS.test(s)) return false;
+  if (!s) return false;
   try {
     const u = new URL(s);
-    return u.protocol === "https:" && Boolean(u.hostname);
+    if (!u.hostname) return false;
+    if (u.protocol === "https:") return true;
+    if (
+      process.env.SHIPLOG_ALLOW_HTTP_NOTIFY === "true" &&
+      u.protocol === "http:" &&
+      (u.hostname === "127.0.0.1" || u.hostname === "localhost")
+    ) {
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }

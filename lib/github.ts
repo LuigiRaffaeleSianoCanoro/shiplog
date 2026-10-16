@@ -20,7 +20,7 @@ let appSlugCache: { slug: string; at: number } | null = null;
 export async function githubAppSlug(): Promise<string | null> {
   if (appSlugCache && Date.now() - appSlugCache.at < 3_600_000) return appSlugCache.slug;
   if (!githubConfigured()) return null;
-  const r = await fetch("https://api.github.com/app", {
+  const r = await fetch(`${env.githubApi.replace(/\/+$/, "")}/app`, {
     headers: { Authorization: `Bearer ${githubAppJwt()}`, Accept: "application/vnd.github+json" },
     cache: "no-store",
   });
@@ -39,7 +39,7 @@ export interface GithubInstallationInfo {
 
 /** Resolve account namespace for a GitHub App installation. */
 export async function getGithubInstallationInfo(installationId: string): Promise<GithubInstallationInfo> {
-  const r = await fetch(`https://api.github.com/app/installations/${encodeURIComponent(installationId)}`, {
+  const r = await fetch(`${env.githubApi.replace(/\/+$/, "")}/app/installations/${encodeURIComponent(installationId)}`, {
     headers: { Authorization: `Bearer ${githubAppJwt()}`, Accept: "application/vnd.github+json" },
     cache: "no-store",
   });
