@@ -105,3 +105,5 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
 - Item 7. Email notifications are out of scope (webhook-only per roadmap). Retry/backoff for failed webhooks is not implemented.
 - Item 14. MCP has no OAuth or per-repo URL tokens (public read only). Optional API rate limiting and OpenAPI export are not implemented.
+
+- 2026-10-16. Community governance docs on `main`. Single-maintainer model documented in GOVERNANCE.md with GitHub Discussions and a 7-day comment window before maintainer decisions, to align with future Open Source Collective expectations. CONTRIBUTOR_LADDER.md follows CNCF-style stages (Participant through Maintainer) plus a 6-month emeritus rule; BACKERS.md mirrors GitHub Sponsors tier names (Mate, Faro, Lobo Marino, Puerto, Rambla, Cortado, Docena de medialunas) without listing sponsors until they opt in. CONTRIBUTING.md now targets pull requests to `main` and includes a "Your first PR in 15 minutes" path.

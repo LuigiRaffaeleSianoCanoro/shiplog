@@ -56,7 +56,7 @@ Public changelog pages show a small **Changelog by Shiplog** badge by default. D
 
 ## Sponsors
 
-Shiplog is open source. GitHub Sponsors for the maintainer: [github.com/sponsors/LuigiRaffaeleSianoCanoro](https://github.com/sponsors/LuigiRaffaeleSianoCanoro). The repo includes [`.github/FUNDING.yml`](.github/FUNDING.yml) so GitHub can surface the sponsor link.
+Shiplog is open source. GitHub Sponsors for the maintainer: [github.com/sponsors/LuigiRaffaeleSianoCanoro](https://github.com/sponsors/LuigiRaffaeleSianoCanoro). The repo includes [`.github/FUNDING.yml`](.github/FUNDING.yml) so GitHub can surface the sponsor link. Public backer recognition (opt-in) lives in [BACKERS.md](BACKERS.md).
 
 When `notes.audiences` is set, Shiplog also drafts **technical** and **customer-facing** release notes in each listed language. In test mode (Neon) they are stored under a repo key like `owner/repo::notes::1.2.0` and posted on the release comment. With a Cursor key, the release agent is asked to write `.shiplog/notes/<version>/<audience>.<lang>.md` files alongside the changelog.
 
