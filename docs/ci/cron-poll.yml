@@ -1,0 +1,19 @@
+# Optional: poll agent runs more often than Vercel Hobby allows (daily only).
+# Copy to .github/workflows/cron-poll.yml and set repository secrets:
+#   CRON_SECRET (same value as on Vercel) and configure SHIPLOG_URL below.
+# Not shipped under .github/workflows/ by default because it requires secrets.
+name: Shiplog cron poll
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/poll
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SHIPLOG_URL: https://your-shiplog-host.example
+        run: |
+          curl -fsS -H "Authorization: Bearer ${CRON_SECRET}" "${SHIPLOG_URL}/api/cron/poll"

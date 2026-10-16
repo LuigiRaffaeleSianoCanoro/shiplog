@@ -1,0 +1,8 @@
+title = "shiplog"
+
+[extend]
+useDefault = true
+
+# Tests set ORIGIN_APP_PRIVATE_KEY to non-PEM placeholders or runtime-generated keys.
+[allowlist]
+paths = ['''test/''']
