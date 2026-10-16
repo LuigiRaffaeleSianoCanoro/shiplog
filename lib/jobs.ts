@@ -5,7 +5,16 @@ import { addEntry, batchPrompt, BREAKING_MARK, bumpNote, changelogPrompt, isBrea
 import { draftAudienceNote, draftEntry, draftSummary } from "./llm";
 import { getRun, launchAgent } from "./cursor";
 import { open, parseMasterKey } from "./crypto";
-import { commentOnPr, getInstallationInfo, getRepoFile, listPrComments, listPrFiles, originConfigured, repoPermission } from "./origin";
+import {
+  commentOnPr,
+  getInstallationInfo,
+  getRepoFile,
+  installProvider,
+  listPrComments,
+  listPrFiles,
+  repoPermission,
+  vcsConfigured,
+} from "./vcs";
 import { DEFAULT_CONFIG, excludedBy, notesEnabled, sectionFor, type ShiplogConfig } from "./config";
 import { loadRepoConfig } from "./repo-config";
 import { allChangelogPaths, changelogTargets } from "./packages";
@@ -24,21 +33,23 @@ export interface Envelope {
  */
 export async function canRelease(installationId: string, repo: string, author: any): Promise<boolean> {
   const userId: string | undefined = author?.user?.id;
-  if (!userId || author?.app || author?.serviceAccount || author?.user?.performedVia?.app) return false;
+  if (!userId || author?.app || author?.serviceAccount || author?.user?.performedVia?.app || author?.user?.type === "Bot") return false;
   const store = getStore();
   const inst = await store.getInstallation(installationId);
+  const provider = inst?.provider ?? "origin";
   let installerId = inst?.installerId ?? null;
   if (installerId && installerId === userId) return true;
-  if (!originConfigured()) return false;
+  if (!vcsConfigured(provider)) return false;
   if (!installerId) {
     try {
-      const info = await getInstallationInfo(installationId);
+      const info = await getInstallationInfo(installationId, provider);
       installerId = info.installerId;
       if (inst) await store.upsertInstallation({ ...inst, installerId, namespace: inst.namespace || info.namespace, namespaceType: info.namespaceType });
     } catch (e) { console.error("[shiplog] installation lookup failed:", (e as Error).message); }
   }
   if (installerId && installerId === userId) return true;
-  const perm = await repoPermission(installationId, repo, userId).catch(() => null);
+  const login: string | undefined = author?.user?.login;
+  const perm = await repoPermission(installationId, repo, userId, login).catch(() => null);
   return perm === "write" || perm === "admin";
 }
 
@@ -47,7 +58,8 @@ const today = () => new Date().toISOString().slice(0, 10);
 /** Post a PR comment via Origin, or record it in the outbox when Origin creds aren't configured (local/demo). Always recorded. */
 async function postComment(installationId: string, repo: string, prNumber: string, body: string) {
   let delivered = false;
-  if (originConfigured() && prNumber) {
+  const provider = await installProvider(installationId);
+  if (vcsConfigured(provider) && prNumber) {
     try { await commentOnPr(installationId, repo, prNumber, body); delivered = true; }
     catch (e) { console.error("[shiplog] comment failed:", (e as Error).message); }
   }
@@ -82,7 +94,8 @@ const isOwnComment = (text: string) => text.trimStart().startsWith("**Shiplog**"
 
 /** The latest `/shiplog skip` or `/shiplog entry` on the PR from someone allowed to run it. */
 async function latestPrCommand(installationId: string, repo: string, prNumber: string): Promise<PrCommand | null> {
-  if (!originConfigured() || !prNumber) return null;
+  const provider = await installProvider(installationId);
+  if (!vcsConfigured(provider) || !prNumber) return null;
   const comments = await listPrComments(installationId, repo, prNumber).catch((e) => { console.error("[shiplog] comments failed:", (e as Error).message); return []; });
   for (const c of comments.reverse()) {
     const cmd = isOwnComment(c.body ?? "") ? null : parsePrCommand(c.body ?? "");
@@ -112,7 +125,8 @@ const styleOf = (cfg: ShiplogConfig, changelogPath: string) => ({ changelogPath,
 
 /** Changed file paths for a merged PR (Origin List Pull Request Files). Falls back to [] without Origin. */
 async function mergedPrFiles(installationId: string, repo: string, prNumber: string): Promise<string[]> {
-  if (!originConfigured() || !prNumber) return [];
+  const provider = await installProvider(installationId);
+  if (!vcsConfigured(provider) || !prNumber) return [];
   try { return await listPrFiles(installationId, repo, prNumber); }
   catch (e) { console.error("[shiplog] pr files failed:", (e as Error).message); return []; }
 }
@@ -138,7 +152,7 @@ async function releaseBumpNotes(installationId: string, repo: string, version: s
   for (const path of paths) {
     let note: string | null;
     if (mode === "neon") note = bumpNote(await store.getChangelog(neonChangelogKey(repo, path)), version);
-    else if (!originConfigured()) continue;
+    else if (!vcsConfigured(await installProvider(installationId))) continue;
     else note = bumpNote(await getRepoFile(installationId, repo, path).catch(() => null), version);
     if (note) lines.push(cfg.packages.length > 1 ? `**${path}** — ${note}` : note);
   }

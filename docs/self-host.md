@@ -75,9 +75,15 @@ In the GitHub App settings:
 
 - **Webhook URL:** `https://<your-vercel-host>/api/webhooks/github`
 - **Setup URL (optional but recommended):** `https://<your-vercel-host>/api/github/install/callback`
-- **Events:** `Installation`, `Pull request`, `Issue comments`, `Pull request review comments`, `Push` (for tags)
+- **Repository permissions:**
+  - **Contents:** Read and write (read `.shiplog.yml`, changelog paths, and optional history backfill commits)
+  - **Issues:** Read and write (PR conversation comments for acknowledgements and prompt fallback)
+  - **Pull requests:** Read (merged PRs, changed files, review comments for `/shiplog` commands)
+  - **Metadata:** Read-only (required by GitHub)
+- **Organization permissions (recommended for org installs):** **Members:** Read-only (collaborator permission checks for `/shiplog` commands)
+- **Subscribe to events:** `Installation`, `Pull request`, `Issue comments`, `Pull request review comments`, `Push` (for tags)
 
-Users can install with `https://<your-host>/api/github/install/start` (same `SHIPLOG_INSTALL_ORIGIN` bounce rules as Origin). Origin App install remains the primary path; both providers can be installed on the same host with separate installation records.
+Users can install with `https://<your-host>/api/github/install/start` (same `SHIPLOG_INSTALL_ORIGIN` bounce rules as Origin). Open `/setup` without an `installation_id` to see links to both install paths. Origin App install remains the primary path; both providers can be installed on the same host with **separate** installation records, keys, and uninstall flows. The dashboard shows a **Provider** column (Origin vs GitHub).
 
 ### Optional
 

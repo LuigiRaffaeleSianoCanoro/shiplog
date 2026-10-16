@@ -83,6 +83,8 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 
 - 2026-10-15. Item 12 (first slice). Shipped `POST /api/webhooks/github` (HMAC `GITHUB_WEBHOOK_SECRET`, `X-GitHub-Delivery` dedupe), `lib/github-adapter.ts` into the existing `handleEvent` pipeline, and GitHub install at `/api/github/install/start` with callback `/api/github/install/callback` persisting `provider=github`. Origin callback sets `provider=origin`. No Supabase migration; `provider` lives on installation JSON in Blob or memory stores like `notifyWebhooks`. Tests cover signature tampering, adapter routing, route persistence, and independent uninstall. Follow-up: GitHub REST for PR comments and permission checks on GitHub-only installs.
 
+- 2026-10-16. Item 12 (second slice). Added `lib/github-api.ts` (GitHub App JWT, installation access token cache, PR issue comments, contents read, PR files, merged PR and tag history, collaborator permission mapping) and `lib/vcs.ts` to route changelog pipeline calls by `provider`. `jobs.ts`, `repo-config.ts`, and `backfill.ts` use the VCS facade so GitHub-only installs post acknowledgements, prompt fallbacks, and permission refusals without Origin credentials. Setup and dashboard show provider badges, dual install links, and provider-specific uninstall copy. Documented GitHub App permissions in `docs/self-host.md`. Tests: `github-api.test.ts`, `vcs-provider.test.ts`, `github-vcs-jobs.test.ts`. No Supabase migration. Origin behavior unchanged when `provider=origin`.
+
 ## Left to do
 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
@@ -99,6 +101,5 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - Item 6. Public page does not yet pull `CHANGELOG.md` from Origin for cursor or prompt mode installs. Luigi or a follow-up can add optional `.shiplog.yml` `public: true` plus Origin file fetch.
 - Item 8. Per-PR audience snippets (before release) and languages beyond en/es are not implemented.
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
-- Item 12. GitHub REST client and setup UX for `provider=github` installs (webhook + install path shipped).
 - Item 7. Email notifications are out of scope (webhook-only per roadmap). Retry/backoff for failed webhooks is not implemented.
 - Item 14. MCP has no OAuth or per-repo URL tokens (public read only). Optional API rate limiting and OpenAPI export are not implemented.
