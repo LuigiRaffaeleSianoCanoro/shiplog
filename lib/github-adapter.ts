@@ -66,7 +66,13 @@ export function githubToEnvelope(event: string, body: any): Envelope | null {
           pullRequest: { number: String(body.issue.number), repository: repo },
           comment: {
             body: body.comment?.body ?? "",
-            author: { user: { id: String(body.comment?.user?.id ?? "") } },
+            author: {
+              user: {
+                id: String(body.comment?.user?.id ?? ""),
+                login: body.comment?.user?.login ?? "",
+                type: body.comment?.user?.type,
+              },
+            },
           },
         },
       },
@@ -82,7 +88,13 @@ export function githubToEnvelope(event: string, body: any): Envelope | null {
           pullRequest: { number: String(body.pull_request?.number ?? ""), repository: repo },
           comment: {
             body: body.comment?.body ?? "",
-            author: { user: { id: String(body.comment?.user?.id ?? "") } },
+            author: {
+              user: {
+                id: String(body.comment?.user?.id ?? ""),
+                login: body.comment?.user?.login ?? "",
+                type: body.comment?.user?.type,
+              },
+            },
           },
         },
       },

@@ -1,6 +1,6 @@
 # ADR 0012: GitHub App install path (roadmap item 12)
 
-**Status:** Accepted (first slice: webhook + install path shipped)
+**Status:** Accepted (second slice: GitHub REST client, dual-provider setup UX)
 
 **Date:** 2026-10-15
 
@@ -34,7 +34,6 @@ Roadmap item 12 asked for product direction: scope, hosting, and how a GitHub pa
 
 - Paid hosted plan (roadmap item 16)
 - In-app changelog widget (roadmap item 15)
-- GitHub API client for PR comments, file reads, and permission checks (webhook + install persistence only in the first slice)
 - GitHub Marketplace listing for the app
 
 ## Consequences
@@ -53,9 +52,8 @@ Roadmap item 12 asked for product direction: scope, hosting, and how a GitHub pa
 
 **Follow-up work**
 
-- GitHub REST client for comments, contents, and collaborator permission checks on `provider=github` installs.
-- Dashboard and setup UX that surfaces provider and links to both install paths.
-- Document GitHub App permissions and events alongside [docs/self-host.md](../self-host.md) (partial notes in self-host today).
+- GitHub Marketplace listing and production GitHub App registration (permissions are documented in [docs/self-host.md](../self-host.md)).
+- Deeper GitHub-only agent ergonomics when Cursor cannot reach the repository (BYOK and prompt-first remain the default).
 
 ## References
 

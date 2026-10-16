@@ -5,11 +5,12 @@ import { buildHistoricalChangelog, changelogNeedsBackfill, type HistoricalPr, ty
 import {
   commitChangelogFile,
   getRepoFile,
+  installProvider,
   listInstallationRepos,
   listMergedPullRequests,
   listSemverTags,
-  originConfigured,
-} from "./origin";
+  vcsConfigured,
+} from "./vcs";
 import { getStore } from "./store";
 
 export type BackfillOutcome = "written" | "stored" | "skipped_existing" | "skipped_disabled" | "skipped_no_origin" | "empty";
@@ -40,8 +41,9 @@ export async function backfillRepoHistory(installationId: string, repo: string, 
   if (!inst || inst.status !== "active") return { repo, outcome: "skipped_no_origin" };
   if (!force && inst.historyBackfillAt?.[repo]) return { repo, outcome: "skipped_existing" };
 
-  if (!originConfigured()) {
-    await markDone(installationId, repo, `skipped:no-origin:${new Date().toISOString()}`);
+  const provider = await installProvider(installationId);
+  if (!vcsConfigured(provider)) {
+    await markDone(installationId, repo, `skipped:no-vcs:${new Date().toISOString()}`);
     return { repo, outcome: "skipped_no_origin" };
   }
 
@@ -82,7 +84,7 @@ export async function backfillRepoHistory(installationId: string, repo: string, 
 }
 
 export async function backfillInstallation(installationId: string, force = false): Promise<BackfillResult[]> {
-  if (!originConfigured()) return [];
+  if (!vcsConfigured(await installProvider(installationId))) return [];
   const repos = await listInstallationRepos(installationId).catch((e) => {
     console.error("[shiplog] list installation repos failed:", (e as Error).message);
     return [];

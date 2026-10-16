@@ -25,7 +25,7 @@ describe("history backfill", () => {
     expect(a.outcome).toBe("skipped_no_origin");
     expect(b.outcome).toBe("skipped_existing");
     const store = (await import("@/lib/store")).getStore();
-    expect((await store.getInstallation("i_hist"))?.historyBackfillAt?.["luigi/demo"]).toMatch(/^skipped:no-origin:/);
+    expect((await store.getInstallation("i_hist"))?.historyBackfillAt?.["luigi/demo"]).toMatch(/^skipped:no-vcs:/);
   });
 
   it("writes changelog via Origin when configured", async () => {

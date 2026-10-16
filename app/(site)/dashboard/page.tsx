@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { COOKIE, readSession } from "@/lib/session";
 import { safeEqual } from "@/lib/crypto";
 import { GITHUB_SPONSORS_URL } from "@/lib/sponsors";
+import { vcsDeliveryLabel } from "@/lib/vcs";
 
 export const dynamic = "force-dynamic";
 
@@ -32,13 +33,13 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       </p>
       <div className="panel fade-up d1">
         <h3>Installations</h3>
-        <div className="table-scroll"><table><thead><tr><th>Installation</th><th>Namespace</th><th>Status</th><th>Key</th><th>Agent runs</th></tr></thead><tbody>
-          {await Promise.all(installs.map(async (i) => { const k = await store.getKey(i.id); const runs = agentRunStats(await store.listJobs(i.id), new Date()); return (
-            <tr key={i.id}><td><code>{i.id}</code></td><td>{i.namespace}</td>
+        <div className="table-scroll"><table><thead><tr><th>Installation</th><th>Provider</th><th>Namespace</th><th>Status</th><th>Key</th><th>Agent runs</th></tr></thead><tbody>
+          {await Promise.all(installs.map(async (i) => { const k = await store.getKey(i.id); const runs = agentRunStats(await store.listJobs(i.id), new Date()); const prov = i.provider ?? "origin"; return (
+            <tr key={i.id}><td><code>{i.id}</code></td><td><span className={prov === "github" ? "pill gray" : "pill"}>{prov === "github" ? "GitHub" : "Origin"}</span></td><td>{i.namespace}</td>
               <td><span className={i.status === "active" ? "pill" : "pill off"}>{i.status === "active" ? "Connected" : i.status === "disconnected" ? "Disconnected" : "Suspended"}</span></td>
               <td>{k ? `•••• ${k.last4}${k.kind === "service_account" ? " · service account" : ""}` : <span className="muted">none (prompt mode)</span>} {scoped && session === i.id && <a href={`/setup?installation_id=${encodeURIComponent(i.id)}`}>{k ? "Rotate" : "Add key"}</a>}</td>
               <td>{runs.last30Days} in 30 days, {runs.total} total<br /><span className="muted">{runs.total ? `paid by the ${k?.kind === "service_account" ? "service account" : "personal"} Cursor key` : "no agent runs yet"}</span></td></tr>); }))}
-          {!installs.length && <tr><td colSpan={5} className="muted">No installations yet.</td></tr>}
+          {!installs.length && <tr><td colSpan={6} className="muted">No installations yet. <a href="/setup">Install on Origin or GitHub</a>.</td></tr>}
         </tbody></table></div>
       </div>
       <div className="panel fade-up d2">
@@ -49,7 +50,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           {!jobs.length && <tr><td colSpan={6} className="muted">Merge a PR to see Shiplog work.</td></tr>}
         </tbody></table></div>
       </div>
-      {outbox.length > 0 && <div className="panel fade-up d3"><h3>Latest PR comments</h3>{outbox.map((o) => <div key={o.id}><p className="muted">{o.repo} #{o.prNumber} {o.delivered ? "· posted to Origin" : !o.prNumber ? "· tag release (no PR to comment on)" : "· recorded (not posted)"}</p><pre>{o.body}</pre></div>)}</div>}
+      {outbox.length > 0 && <div className="panel fade-up d3"><h3>Latest PR comments</h3>{await Promise.all(outbox.map(async (o) => {
+        const label = o.delivered ? `posted to ${await vcsDeliveryLabel(o.installationId)}` : !o.prNumber ? "tag release (no PR to comment on)" : "recorded (not posted)";
+        return <div key={o.id}><p className="muted">{o.repo} #{o.prNumber} · {label}</p><pre>{o.body}</pre></div>;
+      }))}</div>}
     </main>
   );
 }
