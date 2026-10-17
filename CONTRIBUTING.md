@@ -2,6 +2,30 @@
 
 Thanks for helping. This guide covers how to run the project, the code style, and the security rules.
 
+Community docs: [GOVERNANCE.md](GOVERNANCE.md), [SUPPORT.md](SUPPORT.md), [CONTRIBUTOR_LADDER.md](CONTRIBUTOR_LADDER.md), [BACKERS.md](BACKERS.md), [ADOPTERS.md](ADOPTERS.md).
+
+## Your first PR in 15 minutes
+
+1. **Find something small.** Pick a [good first issue](https://github.com/LuigiRaffaeleSianoCanoro/shiplog/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or a docs typo you already spotted. Comment on the issue so nobody duplicates the work.
+2. **Fork and branch.** Fork the repo on GitHub, clone your fork, and create a branch from `main` (for example `docs/fix-typo`).
+3. **Run checks locally.**
+
+   ```bash
+   npm ci
+   npm test
+   npm run typecheck
+   ```
+
+   For documentation-only changes, `npm test` and `npm run typecheck` still run in CI, so run them if you can.
+4. **Commit with sign-off.** Every commit needs DCO sign-off:
+
+   ```bash
+   git commit -s -m "docs: describe your change"
+   ```
+
+5. **Open a pull request to `main`.** The default integration branch is `main` (the MVP work already lives there). Fill in the PR template, link the issue if there is one, and wait for CI. Address review comments with new signed commits or fixups.
+6. **Need help?** Ask in [GitHub Discussions](https://github.com/LuigiRaffaeleSianoCanoro/shiplog/discussions) or see [SUPPORT.md](SUPPORT.md).
+
 ## Run it locally
 
 ```bash
