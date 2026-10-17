@@ -208,7 +208,7 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
       disconnectedAt: null,
     });
     if (type === "installation.created") {
-      backfillInstallation(instId).catch((e) => console.error("[shiplog] install history backfill:", (e as Error).message));
+      await backfillInstallation(instId).catch((e) => console.error("[shiplog] install history backfill:", (e as Error).message));
     }
     return null;
   }

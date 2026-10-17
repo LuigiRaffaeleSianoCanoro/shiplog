@@ -10,20 +10,44 @@ const empty = (): Data => ({ deliveries: [], installations: {}, keys: {}, jobs: 
 export class MemoryStore implements Store {
   private data: Data = empty();
   private loaded = false;
+  private txChain: Promise<unknown> = Promise.resolve();
   private cronPollLock: { expiresAt: number; token: string } | null = null;
   private cronPollToken: string | null = null;
   constructor(private file?: string) {}
+  filePath() {
+    return this.file ?? ".data/shiplog.json";
+  }
   private async load() {
-    if (this.loaded) return; this.loaded = true;
-    if (!this.file) return;
-    try { this.data = { ...empty(), ...JSON.parse(await fs.readFile(this.file, "utf8")) }; } catch { /* first run */ }
+    if (!this.file) {
+      if (!this.loaded) this.loaded = true;
+      return;
+    }
+    try {
+      this.data = { ...empty(), ...JSON.parse(await fs.readFile(this.file, "utf8")) };
+    } catch {
+      if (!this.loaded) this.data = empty();
+    }
+    this.loaded = true;
   }
   private async save() {
     if (!this.file) return;
     await fs.mkdir(path.dirname(this.file), { recursive: true });
     await fs.writeFile(this.file, JSON.stringify(this.data, null, 2));
   }
-  private async tx<T>(fn: (d: Data) => T): Promise<T> { await this.load(); const r = fn(this.data); await this.save(); return r; }
+  private async tx<T>(fn: (d: Data) => T): Promise<T> {
+    const run = async () => {
+      await this.load();
+      const r = fn(this.data);
+      await this.save();
+      return r;
+    };
+    const result = this.txChain.then(run);
+    this.txChain = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
   claimDelivery(id: string) { return this.tx((d) => (d.deliveries.includes(id) ? false : (d.deliveries.push(id), true))); }
   upsertInstallation(i: Installation) { return this.tx((d) => { d.installations[i.id] = { ...d.installations[i.id], ...i }; }); }
   getInstallation(id: string) { return this.tx((d) => d.installations[id] ?? null); }

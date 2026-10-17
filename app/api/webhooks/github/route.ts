@@ -1,4 +1,4 @@
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { verifyGitHubWebhook } from "@/lib/github-webhook";
 import { githubToEnvelope } from "@/lib/github-adapter";
 import { getStore } from "@/lib/store";
@@ -47,11 +47,11 @@ export async function POST(req: Request) {
   const envelope = githubToEnvelope(event, body);
   if (!envelope) return NextResponse.json({ ok: true, ignored: true }, { status: 202 });
 
-  after(() =>
-    (async () => {
-      if (envelope.installationId) await markGithubInstall(envelope.installationId, body);
-      await handleEvent(envelope, deliveryId);
-    })().catch((e) => console.error("[shiplog] github job error:", (e as Error).message)),
-  );
+  try {
+    if (envelope.installationId) await markGithubInstall(envelope.installationId, body);
+    await handleEvent(envelope, deliveryId);
+  } catch (e) {
+    console.error("[shiplog] github job error:", (e as Error).message);
+  }
   return NextResponse.json({ ok: true }, { status: 202 });
 }

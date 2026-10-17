@@ -136,6 +136,9 @@ export default async function globalSetup() {
   mockProc.stderr?.on("data", (d) => process.stderr.write(d));
   await waitForUrl(`${mockUrl}/keys`);
 
+  const envLocalPath = join(__dir, "..", ".env.production.local");
+  writeFileSync(envLocalPath, `SHIPLOG_DATA_FILE=${dataFile}\n`, "utf8");
+
   if (process.env.E2E_SKIP_BUILD !== "1") {
     execSync("npm run build", {
       cwd: join(__dir, ".."),
