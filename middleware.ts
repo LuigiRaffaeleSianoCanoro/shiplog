@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { publicPathShouldReject } from "@/lib/public-path-guard";
+import { publicPathShouldReject } from "./edge/public-path-guard";
 
 export function middleware(req: NextRequest) {
   if (publicPathShouldReject(req.nextUrl.pathname)) {
