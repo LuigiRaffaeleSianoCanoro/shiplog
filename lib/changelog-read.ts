@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { EMPTY, neonChangelogKey, type Section } from "./changelog";
 import {
   buildJsonFeed,
@@ -63,7 +64,7 @@ export interface ResolvedReadableChangelog {
   document: ChangelogDocument;
 }
 
-export async function resolveReadableChangelog(
+async function resolveReadableChangelogUncached(
   namespace: string,
   repo: string,
   store: Store,
@@ -71,8 +72,7 @@ export async function resolveReadableChangelog(
 ): Promise<ResolvedReadableChangelog | null> {
   const repoSlug = publicRepoSlug(namespace, repo);
   if (!repoSlug) return null;
-  const installs = await store.listInstallations();
-  const active = installs.find((i) => i.status === "active" && i.namespace === namespace);
+  const active = await store.getActiveInstallationByNamespace(namespace);
   if (!active) return null;
   const normalized = normalizeChangelogPath(changelogPath);
   const storageKey = storageKeyForChangelogPath(repoSlug, normalized === "CHANGELOG.md" ? null : normalized);
@@ -87,6 +87,8 @@ export async function resolveReadableChangelog(
     document: parseChangelogDocument(markdown),
   };
 }
+
+export const resolveReadableChangelog = cache(resolveReadableChangelogUncached);
 
 export interface ChangelogApiPayload extends JsonFeed {
   apiVersion: "v1";
@@ -148,4 +150,4 @@ export function findRelease(payload: ChangelogApiPayload, version: string): Rele
   };
 }
 
-export const CHANGELOG_READ_CACHE = "public, max-age=60, stale-while-revalidate=300";
+export const CHANGELOG_READ_CACHE = "public, s-maxage=300, stale-while-revalidate=600";

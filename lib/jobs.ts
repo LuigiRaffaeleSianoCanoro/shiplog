@@ -21,6 +21,7 @@ import { allChangelogPaths, changelogTargets } from "./packages";
 import { mergeNotifyWebhooks, notifyWebhooks, type NotifyPayload } from "./notify";
 import { formatAudienceNotesBlock, notesStorageKey, releaseNotesInstructions, type AudienceNotes } from "./notes";
 import { backfillInstallation, maybeBackfillOnFirstVisit } from "./backfill";
+import { persistChangelog } from "./changelog-invalidate";
 
 export interface Envelope {
   deliveryId?: string; installationId: string;
@@ -299,7 +300,7 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
         for (const path of paths) {
           const key = neonChangelogKey(repo, path);
           const md = addEntry(await store.getChangelog(key), section, bullet);
-          await store.putChangelog(key, md);
+          await persistChangelog(store, key, md);
           blocks.push(`<!-- ${path} -->\n### ${section}\n- ${bullet}`);
         }
         job.result = blocks.join("\n\n");
@@ -334,13 +335,13 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
           allNotes.push(notes);
           const summary = await draftSummary(v, notes);
           const md = cutRelease(before, v, today(), summary);
-          await store.putChangelog(key, md);
+          await persistChangelog(store, key, md);
           blocks.push(`<!-- ${path} -->\n## [${v.replace(/^v/, "")}] - ${today()}\n\n${summary}\n\n${notes}`);
         }
         let audienceBlock = "";
         if (notesEnabled(cfg) && allNotes.length) {
           const bundle = await draftStoredAudienceNotes(cfg, v, allNotes.join("\n\n"));
-          await store.putChangelog(notesStorageKey(repo, v), JSON.stringify(bundle, null, 2));
+          await persistChangelog(store, notesStorageKey(repo, v), JSON.stringify(bundle, null, 2));
           audienceBlock = `\n\n${formatAudienceNotesBlock(v, bundle)}`;
         }
         job.result = blocks.length ? blocks.join("\n\n\n") : `no unreleased content`;

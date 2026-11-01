@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { del, get, list, put } from "@vercel/blob";
+import { pickNewestActiveInstallation } from "../installation-namespace";
 import type { Installation, Job, Outbox, Store, UserKey } from "./types";
 
 /**
@@ -34,6 +35,8 @@ async function readAll<T>(prefix: string, limit = 100): Promise<T[]> {
 const rev = (iso: string) => String(9_999_999_999_999 - new Date(iso || Date.now()).getTime()).padStart(13, "0");
 const CRON_LOCK = `${P}/locks/cron-poll.json`;
 type CronPollLock = { expiresAt: string; token: string };
+type NamespaceIndex = { installationId: string; createdAt: string };
+const nsIndexPath = (namespace: string) => `${P}/ns/${enc(namespace)}.json`;
 
 export class BlobStore implements Store {
   private cronPollToken: string | null = null;
@@ -44,8 +47,56 @@ export class BlobStore implements Store {
   async upsertInstallation(i: Installation) {
     const prev = await this.getInstallation(i.id);
     await write(`${P}/installations/${enc(i.id)}.json`, { ...prev, ...i });
+    await this.syncNamespaceIndex({ ...prev, ...i } as Installation);
   }
   getInstallation(id: string) { return readJson<Installation>(`${P}/installations/${enc(id)}.json`); }
+  private async syncNamespaceIndex(i: Installation) {
+    const path = nsIndexPath(i.namespace);
+    if (i.status !== "active") {
+      const cur = await readJson<NamespaceIndex>(path);
+      if (cur?.installationId === i.id) await del(path);
+      return;
+    }
+    const cur = await readJson<NamespaceIndex>(path);
+    if (!cur) {
+      await write(path, { installationId: i.id, createdAt: i.createdAt });
+      return;
+    }
+    if (cur.installationId === i.id) {
+      await write(path, { installationId: i.id, createdAt: i.createdAt });
+      return;
+    }
+    const indexed = await this.getInstallation(cur.installationId);
+    const indexedCreated = indexed?.createdAt ?? cur.createdAt;
+    if (i.createdAt.localeCompare(indexedCreated) >= 0) {
+      await write(path, { installationId: i.id, createdAt: i.createdAt });
+    }
+  }
+  async getActiveInstallationByNamespace(namespace: string) {
+    const idx = await readJson<NamespaceIndex>(nsIndexPath(namespace));
+    if (idx) {
+      const inst = await this.getInstallation(idx.installationId);
+      if (inst?.status === "active" && inst.namespace === namespace) return inst;
+    }
+    const active = pickNewestActiveInstallation(await this.listInstallations(), namespace);
+    if (active) await write(nsIndexPath(namespace), { installationId: active.id, createdAt: active.createdAt });
+    return active;
+  }
+  async backfillNamespaceIndex() {
+    const installs = await this.listInstallations();
+    const byNs = new Map<string, Installation>();
+    for (const i of installs) {
+      if (i.status !== "active") continue;
+      const prev = byNs.get(i.namespace);
+      if (!prev || i.createdAt.localeCompare(prev.createdAt) > 0) byNs.set(i.namespace, i);
+    }
+    let written = 0;
+    for (const [namespace, inst] of byNs) {
+      await write(nsIndexPath(namespace), { installationId: inst.id, createdAt: inst.createdAt });
+      written++;
+    }
+    return written;
+  }
   async listInstallations() { return (await readAll<Installation>(`${P}/installations/`)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
   async putKey(k: UserKey) { await write(`${P}/keys/${enc(k.installationId)}.json`, k); }
   getKey(id: string) { return readJson<UserKey>(`${P}/keys/${enc(id)}.json`); }

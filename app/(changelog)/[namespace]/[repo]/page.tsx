@@ -6,7 +6,7 @@ import { buildPublicMeta, publicPageTitle, resolvePublicChangelog } from "@/lib/
 import { requestOrigin } from "@/lib/request-origin";
 import { getStore } from "@/lib/store";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 type Props = { params: Promise<{ namespace: string; repo: string }> };
 

@@ -23,6 +23,13 @@ export class SupabaseStore implements Store {
   }
   private mapI = (r: any): Installation => ({ id: r.id, namespace: r.namespace, status: r.status, createdAt: r.created_at, disconnectedAt: r.disconnected_at });
   async getInstallation(id: string) { const r = await this.rows<any>(`shiplog_installations?id=eq.${encodeURIComponent(id)}`); return r[0] ? this.mapI(r[0]) : null; }
+  async getActiveInstallationByNamespace(namespace: string) {
+    const r = await this.rows<any>(
+      `shiplog_installations?namespace=eq.${encodeURIComponent(namespace)}&status=eq.active&order=created_at.desc&limit=1`,
+    );
+    return r[0] ? this.mapI(r[0]) : null;
+  }
+  async backfillNamespaceIndex() { return 0; }
   async listInstallations() { return (await this.rows<any>("shiplog_installations?order=created_at.desc")).map(this.mapI); }
   async putKey(k: UserKey) {
     await this.q("shiplog_user_keys?on_conflict=installation_id", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal",

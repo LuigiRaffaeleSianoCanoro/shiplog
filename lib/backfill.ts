@@ -11,6 +11,7 @@ import {
   listSemverTags,
   vcsConfigured,
 } from "./vcs";
+import { persistChangelog } from "./changelog-invalidate";
 import { getStore } from "./store";
 
 export type BackfillOutcome = "written" | "stored" | "skipped_existing" | "skipped_disabled" | "skipped_no_origin" | "empty";
@@ -69,7 +70,7 @@ export async function backfillRepoHistory(installationId: string, repo: string, 
   }
 
   const md = buildHistoricalChangelog(prs, tags, cfg);
-  if (env.llmProvider === "neon") await store.putChangelog(repo, md);
+  if (env.llmProvider === "neon") await persistChangelog(store, repo, md);
   let outcome: BackfillOutcome = env.llmProvider === "neon" ? "stored" : "written";
   try {
     await commitChangelogFile(installationId, repo, cfg.changelogPath, md, "docs(changelog): initial history from Shiplog");
