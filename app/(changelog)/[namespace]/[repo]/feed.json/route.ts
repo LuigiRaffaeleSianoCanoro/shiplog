@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { buildJsonFeed, buildPublicMeta, resolvePublicChangelog } from "@/lib/public-changelog";
+import { trackFeedRead } from "@/lib/analytics/track";
 import { requestOrigin } from "@/lib/request-origin";
 import { getStore } from "@/lib/store";
 
@@ -7,10 +8,11 @@ export const revalidate = 300;
 
 type Ctx = { params: Promise<{ namespace: string; repo: string }> };
 
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
   const { namespace, repo } = await ctx.params;
   const data = await resolvePublicChangelog(namespace, repo, getStore());
   if (!data) notFound();
+  await trackFeedRead("json", data.repoSlug, req.headers.get("user-agent"));
   const origin = await requestOrigin();
   const meta = buildPublicMeta(origin, namespace, repo);
   const body = JSON.stringify(buildJsonFeed(data.document, meta), null, 2);

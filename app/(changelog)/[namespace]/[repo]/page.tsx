@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { SECTIONS } from "@/lib/changelog";
+import { trackPublicChangelogViewed } from "@/lib/analytics/track";
 import { buildPublicMeta, publicPageTitle, resolvePublicChangelog } from "@/lib/public-changelog";
 import { requestOrigin } from "@/lib/request-origin";
 import { getStore } from "@/lib/store";
@@ -33,6 +35,8 @@ export default async function PublicChangelogPage({ params }: Props) {
   const { namespace, repo } = await params;
   const data = await resolvePublicChangelog(namespace, repo, getStore());
   if (!data) notFound();
+  const ua = (await headers()).get("user-agent");
+  await trackPublicChangelogViewed(data.repoSlug, ua);
   const origin = await requestOrigin();
   const pageUrl = buildPublicMeta(origin, namespace, repo).pageUrl;
   const releases = data.document.releases.filter(

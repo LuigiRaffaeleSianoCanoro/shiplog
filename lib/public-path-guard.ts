@@ -1,7 +1,7 @@
 /** Same rules as public changelog slugs (first segment must be alnum). */
 const VALID_SEG = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 
-const SKIP_PREFIXES = ["api", "_next", "brand", "dashboard", "privacy", "setup"];
+const SKIP_PREFIXES = ["api", "_next", "brand", "dashboard", "privacy", "setup", "ingest"];
 
 function segmentIsProbe(segment: string): boolean {
   if (/^wp-/i.test(segment)) return true;

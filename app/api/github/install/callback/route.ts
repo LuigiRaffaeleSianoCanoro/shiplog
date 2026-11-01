@@ -3,6 +3,7 @@ import { env } from "@/lib/env";
 import { getStore } from "@/lib/store";
 import { COOKIE, signSession } from "@/lib/session";
 import { getGithubInstallationInfo, githubConfigured } from "@/lib/github";
+import { trackInstallationCreated } from "@/lib/analytics/track";
 
 export const runtime = "nodejs";
 
@@ -49,6 +50,10 @@ export async function GET(req: Request) {
     disconnectedAt: null,
     installerId,
   });
+
+  if (!existing || existing.status !== "active") {
+    await trackInstallationCreated("github", installationId);
+  }
 
   const res = NextResponse.redirect(new URL(`/setup?installation_id=${encodeURIComponent(installationId)}`, url.origin));
   res.cookies.set(COOKIE, signSession(installationId), {
