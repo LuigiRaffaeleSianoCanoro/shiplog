@@ -21,6 +21,7 @@ import { allChangelogPaths, changelogTargets } from "./packages";
 import { mergeNotifyWebhooks, notifyWebhooks, type NotifyPayload } from "./notify";
 import { formatAudienceNotesBlock, notesStorageKey, releaseNotesInstructions, type AudienceNotes } from "./notes";
 import { backfillInstallation, maybeBackfillOnFirstVisit } from "./backfill";
+import { trackInstallationCreated, trackInstallationDeleted, trackAgentAnnouncement, trackJobCompletion } from "./analytics/track";
 import { persistChangelog } from "./changelog-invalidate";
 
 export interface Envelope {
@@ -210,6 +211,7 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
     });
     if (type === "installation.created") {
       await backfillInstallation(instId).catch((e) => console.error("[shiplog] install history backfill:", (e as Error).message));
+      await trackInstallationCreated(prev?.provider ?? "origin", instId);
     }
     return null;
   }
@@ -222,6 +224,7 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
     const i = await store.getInstallation(instId);
     await store.upsertInstallation({ ...(i ?? { id: instId, namespace: "", createdAt: now, provider: "origin" }), status: "disconnected", disconnectedAt: now });
     await store.deleteKey(instId);
+    await trackInstallationDeleted(i?.provider ?? "origin", instId);
     return null;
   }
 
@@ -367,6 +370,7 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
     job.result = (e as Error).message;
   }
   await store.putJob(job);
+  await trackJobCompletion(job);
   return job;
 }
 
@@ -464,6 +468,7 @@ export async function pollAgents(): Promise<number> {
             ? { event: "release_cut", repo: job.repo, prNumber: job.prNumber, prUrl: job.prUrl, detail }
             : { event: "changelog_entry", repo: job.repo, prNumber: job.prNumber, prUrl: job.prUrl, detail };
           fireUserNotify(job.installationId, cfg, payload);
+          await trackAgentAnnouncement(job);
         }
       }
     } catch (e) { console.error("[shiplog] poll error:", (e as Error).message); }

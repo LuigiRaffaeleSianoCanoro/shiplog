@@ -52,6 +52,11 @@ export async function POST(req: Request) {
     await handleEvent(envelope, deliveryId);
   } catch (e) {
     console.error("[shiplog] github job error:", (e as Error).message);
+    const { captureServerException, flushServerAnalytics } = await import("@/lib/analytics/server");
+    await captureServerException(e as Error, { route: "/api/webhooks/github" });
+    await flushServerAnalytics();
   }
+  const { flushServerAnalytics } = await import("@/lib/analytics/server");
+  await flushServerAnalytics();
   return NextResponse.json({ ok: true }, { status: 202 });
 }
