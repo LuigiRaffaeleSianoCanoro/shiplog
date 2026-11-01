@@ -1,6 +1,3 @@
-import "server-only";
-
-import { PostHog } from "posthog-node";
 import { AnalyticsEvents } from "./events";
 
 export interface AnalyticsSink {
@@ -10,7 +7,9 @@ export interface AnalyticsSink {
   shutdown: () => Promise<void>;
 }
 
-let client: PostHog | null | undefined;
+type PostHogClient = import("posthog-node").PostHog;
+
+let client: PostHogClient | null | undefined;
 let testSink: AnalyticsSink | null = null;
 
 function posthogHost(): string {
@@ -31,13 +30,14 @@ export function resetAnalyticsForTests(): void {
   client = undefined;
 }
 
-function getClient(): PostHog | null {
+async function getClient(): Promise<PostHogClient | null> {
   if (client !== undefined) return client;
   const key = posthogKey();
   if (!key) {
     client = null;
     return client;
   }
+  const { PostHog } = await import("posthog-node");
   client = new PostHog(key, {
     host: posthogHost(),
     flushAt: 1,
@@ -46,9 +46,9 @@ function getClient(): PostHog | null {
   return client;
 }
 
-function activeSink(): AnalyticsSink | null {
+async function activeSink(): Promise<AnalyticsSink | null> {
   if (testSink) return testSink;
-  const ph = getClient();
+  const ph = await getClient();
   if (!ph) return null;
   return {
     capture: (event, properties) => ph.capture({ distinctId: serverDistinctId(properties), event, properties }),
@@ -67,26 +67,26 @@ function serverDistinctId(properties?: Record<string, unknown>): string {
 }
 
 export async function captureServerEvent(event: string, properties?: Record<string, unknown>): Promise<void> {
-  const sink = activeSink();
+  const sink = await activeSink();
   if (!sink) return;
   sink.capture(event, properties);
 }
 
 export async function captureServerException(error: Error, properties?: Record<string, unknown>): Promise<void> {
-  const sink = activeSink();
+  const sink = await activeSink();
   if (!sink) return;
   sink.captureException(error, properties);
 }
 
 export async function flushServerAnalytics(): Promise<void> {
-  const sink = activeSink();
+  const sink = await activeSink();
   if (!sink) return;
   await sink.flush();
 }
 
 export async function shutdownServerAnalytics(): Promise<void> {
   if (testSink) return;
-  const ph = getClient();
+  const ph = await getClient();
   if (!ph) return;
   await ph.shutdown();
 }

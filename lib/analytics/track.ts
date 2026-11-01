@@ -1,5 +1,3 @@
-import "server-only";
-
 import { after } from "next/server";
 import type { Job } from "@/lib/store";
 import { isLikelyBotUserAgent } from "./bot";
