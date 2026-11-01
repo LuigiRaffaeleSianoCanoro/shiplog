@@ -3,7 +3,7 @@ import { buildJsonFeed, buildPublicMeta, resolvePublicChangelog } from "@/lib/pu
 import { requestOrigin } from "@/lib/request-origin";
 import { getStore } from "@/lib/store";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 type Ctx = { params: Promise<{ namespace: string; repo: string }> };
 
@@ -17,7 +17,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   return new Response(body, {
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "cache-control": "public, max-age=60, stale-while-revalidate=300",
+      "cache-control": "public, s-maxage=300, stale-while-revalidate=600",
     },
   });
 }

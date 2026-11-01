@@ -1,7 +1,7 @@
 import { getPackagesApiResponse, jsonResponse } from "@/lib/changelog-api-http";
 import { getStore } from "@/lib/store";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 type Ctx = { params: Promise<{ namespace: string; repo: string }> };
 

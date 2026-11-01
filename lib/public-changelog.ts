@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { EMPTY, SECTIONS, type Section } from "./changelog";
 import { loadRepoConfig } from "./repo-config";
 import type { Store } from "./store";
@@ -145,12 +146,10 @@ export interface ResolvedPublicChangelog {
   showPoweredBy: boolean;
 }
 
-/** Active installation for namespace plus stored changelog markdown (defaults to EMPTY). */
-export async function resolvePublicChangelog(namespace: string, repo: string, store: Store): Promise<ResolvedPublicChangelog | null> {
+async function resolvePublicChangelogUncached(namespace: string, repo: string, store: Store): Promise<ResolvedPublicChangelog | null> {
   const repoSlug = publicRepoSlug(namespace, repo);
   if (!repoSlug) return null;
-  const installs = await store.listInstallations();
-  const active = installs.find((i) => i.status === "active" && i.namespace === namespace);
+  const active = await store.getActiveInstallationByNamespace(namespace);
   if (!active) return null;
   const markdown = (await store.getChangelog(repoSlug)) ?? EMPTY;
   const cfg = await loadRepoConfig(active.id, repoSlug);
@@ -163,6 +162,9 @@ export async function resolvePublicChangelog(namespace: string, repo: string, st
     showPoweredBy: cfg.poweredBy,
   };
 }
+
+/** Active installation for namespace plus stored changelog markdown (defaults to EMPTY). */
+export const resolvePublicChangelog = cache(resolvePublicChangelogUncached);
 
 export function publicPageTitle(namespace: string, repo: string) {
   return `${repo} changelog`;

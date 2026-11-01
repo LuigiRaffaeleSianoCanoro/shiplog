@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { pickNewestActiveInstallation } from "../installation-namespace";
 import type { Installation, Job, Outbox, Store, UserKey } from "./types";
 
 interface Data { deliveries: string[]; installations: Record<string, Installation>; keys: Record<string, UserKey>; jobs: Job[]; outbox: Outbox[]; changelogs: Record<string, string> }
@@ -51,6 +52,10 @@ export class MemoryStore implements Store {
   claimDelivery(id: string) { return this.tx((d) => (d.deliveries.includes(id) ? false : (d.deliveries.push(id), true))); }
   upsertInstallation(i: Installation) { return this.tx((d) => { d.installations[i.id] = { ...d.installations[i.id], ...i }; }); }
   getInstallation(id: string) { return this.tx((d) => d.installations[id] ?? null); }
+  getActiveInstallationByNamespace(namespace: string) {
+    return this.tx((d) => pickNewestActiveInstallation(Object.values(d.installations), namespace));
+  }
+  async backfillNamespaceIndex() { return 0; }
   listInstallations() { return this.tx((d) => Object.values(d.installations)); }
   putKey(k: UserKey) { return this.tx((d) => { d.keys[k.installationId] = k; }); }
   getKey(id: string) { return this.tx((d) => d.keys[id] ?? null); }

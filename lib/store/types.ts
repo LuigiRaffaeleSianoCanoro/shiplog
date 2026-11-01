@@ -30,7 +30,11 @@ export interface Store {
   claimDelivery(deliveryId: string): Promise<boolean>;
   upsertInstallation(i: Installation): Promise<void>;
   getInstallation(id: string): Promise<Installation | null>;
+  /** Newest active installation for a public namespace (no full installation listing on read paths). */
+  getActiveInstallationByNamespace(namespace: string): Promise<Installation | null>;
   listInstallations(): Promise<Installation[]>;
+  /** One-time migration: rebuild namespace index blobs from installation records. */
+  backfillNamespaceIndex(): Promise<number>;
   putKey(k: UserKey): Promise<void>;
   getKey(installationId: string): Promise<UserKey | null>;
   deleteKey(installationId: string): Promise<void>;
