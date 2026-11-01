@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { Manrope, Oswald } from "next/font/google";
-import { Suspense } from "react";
-import { PostHogProvider } from "./posthog-provider";
 import "./globals.css";
 
 const display = Oswald({ subsets: ["latin"], weight: ["700"], variable: "--font-display" });
@@ -19,11 +17,7 @@ export const viewport = { themeColor: "#13235A" };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${manrope.variable}`}>
-      <body>
-        <Suspense fallback={null}>
-          <PostHogProvider>{children}</PostHogProvider>
-        </Suspense>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
