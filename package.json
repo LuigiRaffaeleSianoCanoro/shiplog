@@ -14,7 +14,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@vercel/blob": "^2.8.1",
-    "next": "^16.4.2",
+    "next": "^16.4.4",
     "posthog-js": "^1.444.0",
     "posthog-node": "^4.18.0",
     "react": "^19.3.1",
