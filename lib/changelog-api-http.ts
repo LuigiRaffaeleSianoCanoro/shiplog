@@ -1,5 +1,6 @@
 import { CHANGELOG_READ_CACHE, buildChangelogApiPayload, changelogPathFromQuery, findRelease, listPublicPackagePaths, resolveReadableChangelog } from "./changelog-read";
 import type { Store } from "./store";
+import { isStoreAuthError } from "./store/store-auth-error";
 
 export function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -9,6 +10,15 @@ export function jsonResponse(body: unknown, status = 200) {
       "cache-control": CHANGELOG_READ_CACHE,
     },
   });
+}
+
+export async function withStoreAuth<T>(work: () => Promise<T>): Promise<T | Response> {
+  try {
+    return await work();
+  } catch (err) {
+    if (isStoreAuthError(err)) return jsonResponse({ error: "store_unavailable" }, 503);
+    throw err;
+  }
 }
 
 export async function getChangelogApiResponse(namespace: string, repo: string, store: Store, origin: string, searchParams: URLSearchParams) {

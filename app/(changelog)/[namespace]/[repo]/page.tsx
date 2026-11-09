@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { SECTIONS } from "@/lib/changelog";
 import { trackPublicChangelogViewed } from "@/lib/analytics/track";
-import { buildPublicMeta, publicPageTitle, resolvePublicChangelog } from "@/lib/public-changelog";
+import { buildPublicMeta, loadPublicChangelog, publicPageTitle } from "@/lib/public-changelog";
 import { requestOrigin } from "@/lib/request-origin";
+import { StoreUnavailableView } from "@/lib/store-unavailable-view";
 import { getStore } from "@/lib/store";
 
 export const revalidate = 300;
@@ -14,8 +15,10 @@ type Props = { params: Promise<{ namespace: string; repo: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { namespace, repo } = await params;
-  const data = await resolvePublicChangelog(namespace, repo, getStore());
-  if (!data) return { title: "Not found" };
+  const loaded = await loadPublicChangelog(namespace, repo, getStore());
+  if (loaded.status === "store_unavailable") return { title: "Unavailable" };
+  if (loaded.status === "not_found") return { title: "Not found" };
+  const data = loaded.data;
   const title = publicPageTitle(namespace, repo);
   const origin = await requestOrigin();
   const pageUrl = buildPublicMeta(origin, namespace, repo).pageUrl;
@@ -33,8 +36,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PublicChangelogPage({ params }: Props) {
   const { namespace, repo } = await params;
-  const data = await resolvePublicChangelog(namespace, repo, getStore());
-  if (!data) notFound();
+  const loaded = await loadPublicChangelog(namespace, repo, getStore());
+  if (loaded.status === "store_unavailable") return <StoreUnavailableView />;
+  if (loaded.status === "not_found") notFound();
+  const data = loaded.data;
   const ua = (await headers()).get("user-agent");
   await trackPublicChangelogViewed(data.repoSlug, ua);
   const origin = await requestOrigin();
