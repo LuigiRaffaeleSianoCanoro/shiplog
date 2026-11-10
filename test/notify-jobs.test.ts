@@ -36,7 +36,7 @@ describe("user notify webhooks in jobs", () => {
     expect(f.mock.calls.some((c) => c[0] === slack)).toBe(true);
     const slackBody = JSON.parse(String(f.mock.calls.find((c) => c[0] === slack)?.[1]?.body));
     expect(slackBody.text).toContain("Widgets");
-    expect(err.mock.calls.some((c) => String(c[0]).includes("notify webhook failed"))).toBe(true);
+    expect(err.mock.calls.some((c) => String(c[0]).includes("notify webhook attempt"))).toBe(true);
 
     await store.upsertInstallation({ ...(await store.getInstallation("i_1"))!, installerId: "u" });
     const rel = await jobs.handleEvent({ installationId: "i_1", event: { type: "pull_request.comment.created", payload: { pullRequest: { number: "3", repository: { name: "demo", owner: { slug: "luigi" } } }, comment: { body: "/shiplog release v2.0.0", author: { user: { id: "u" } } } } } }, "n2");
