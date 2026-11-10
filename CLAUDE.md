@@ -1,0 +1,3 @@
+# CLAUDE.md — Content-creation skills pack
+
+Read `AGENTS.md` (hard rules, how to use, skills index) and **`PROJECT_CONTENT_RULES.md`** for Shiplog-specific brand, channels, and claims. Skills are in `.agents/skills/<name>/SKILL.md`; load the one whose description matches the task. For any video: `reel-production-complete-edit` + `video-review-package` + the specific editorial skill. Tested ffmpeg recipes: `docs/ffmpeg-cookbook.md`. QA before delivery: `docs/qa-checklist.md`. When you make a new video you are producing the Claude Opus version; Luigi compares it with a Gemini version. Never publish; deliver a Review package.
