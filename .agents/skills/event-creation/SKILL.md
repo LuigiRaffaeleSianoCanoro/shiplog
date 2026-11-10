@@ -22,7 +22,7 @@ No publicar: entregar los campos listos para pegar. Luigi los carga/aprueba.
 Título divertido (emoji ok), fecha/hora, lugar, descripción corta (≤80 palabras, tono más social), tema visual sugerido, ¿mostrar lista de invitados?, máx. invitados, preguntas de RSVP, link a mardelplata.dev.ar. También en borrador.
 
 ## Reglas propias
-- Si falta fecha, lugar o capacidad: `[TBD]` en el borrador. No inventar speakers ni sponsors confirmados.
+- Si falta fecha, lugar o capacidad: `[FALTA-DATO]` en el borrador. No inventar speakers ni sponsors confirmados.
 - Si el venue es real, se puede confirmar la dirección con búsqueda web.
 - Copy en voz rioplatense, pasado por `qa-texto-anti-tropes-llm`.
 

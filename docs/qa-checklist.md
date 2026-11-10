@@ -50,7 +50,7 @@ Estados (nombres exactos, nunca mezclarlos):
 - [ ] Legibles en el celular a brazo extendido (tamaño, contraste, tiempo en pantalla: ~0.4 s por palabra, mínimo ~2.5 s).
 - [ ] Ortografía de nombres, cargos y empresas verificada contra el brief.
 - [ ] Si se sacó una pregunta del entrevistador, hay banner con la pregunta legible el tiempo suficiente; no queda un salto pelado.
-- [ ] Tipografía final, sin chips "PRUEBA"/draft, sin placeholders ("[nombre]", "TBD", "Lorem").
+- [ ] Tipografía final, sin chips "PRUEBA"/draft, sin placeholders ("[nombre]", "FALTA-DATO", "Lorem").
 - [ ] Banners corporativos a pantalla completa: apagados por defecto.
 
 ### A7. Encuadre, formato y zonas seguras
@@ -109,7 +109,7 @@ Aplica a captions, guiones, VO, títulos, placas, decks, posts, mails. Fail-clos
 - [ ] Marcas tal cual se escriben (Grok Bot, Cursor, SpaceXSI Community, mardelplata.dev.ar).
 
 ### B3. Separación de notas internas y copy publicable
-- [ ] El archivo publicable tiene SOLO el texto a publicar. Nada de `[TBD]`, "opción A/B", "alt text:", "caption:", "slide 1", "borrador", "v2", "aprobado", indicaciones de producción ("esto se sube como carrusel en 5 historias"), mensajes al equipo, nombres de agentes, markdown (`**`, `##`, guiones de lista) ni placeholders.
+- [ ] El archivo publicable tiene SOLO el texto a publicar. Nada de `[FALTA-DATO]`, "opción A/B", "alt text:", "caption:", "slide 1", "borrador", "v2", "aprobado", indicaciones de producción ("esto se sube como carrusel en 5 historias"), mensajes al equipo, nombres de agentes, markdown (`**`, `##`, guiones de lista) ni placeholders.
 - [ ] Falta un dato = no se publica esa parte (se saca o se saltea el post); nunca se rellena con placeholder.
 - [ ] Chequeo automático (opcional): `python3 content-tools/prepublish_check.py --network ig|x --file post.txt` → tiene que dar PASS.
 - [ ] Segunda lectura en frío (otro modelo o relectura sin contexto) que recibe SOLO el texto final y la red, y responde SÍ/NO: "¿Esto se puede publicar tal cual en la cuenta pública, sin notas internas, placeholders ni mensajes al equipo?". Cualquier NO o duda = no se publica.

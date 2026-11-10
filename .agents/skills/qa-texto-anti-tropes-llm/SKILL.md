@@ -27,7 +27,7 @@ Fail closed: banned pattern → rewrite; do not ship the contaminated draft. Ful
 - Sponsor/referral copy that could fit any brand (code + "recompensa" + link) with no concrete product fact.
 - **Luigi feedback (2026-09-28):** fail any bumper, script or copy that uses «corte» to mean a commercial or sponsor break, including «Este corte es con X», «corte comercial», «vamos a un corte» or any variant. Also fail the rejected openers: starting with the use case and moving the disclosure to the end («Para pagar acá en San Francisco uso X…»), «Te cuento de una app que uso», or «Esto es con mi link de referido».
 - Significance inflation, AI vocabulary, rule-of-three fluff, em dashes as drama (see `ai-copywriter`).
-- Production notes or internal indications inside publishable text ("esto se sube como carrusel en 5 historias", "opción A", "[TBD]", "alt text:"). They live in a separate, clearly marked internal note.
+- Production notes or internal indications inside publishable text ("esto se sube como carrusel en 5 historias", "opción A", "[FALTA-DATO]", "alt text:"). They live in a separate, clearly marked internal note.
 - Wrong naming: "SpaceXAI", "embajador de SpaceX/SpaceXSI", "oficial"; "mardelplata.dev" without ".ar".
 
 ## Fix

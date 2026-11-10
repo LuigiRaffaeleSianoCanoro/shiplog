@@ -35,8 +35,8 @@ Siempre necesitan el OK de Luigi, sin excepción: anuncios pagos, todo lo relaci
 
 ## Compuerta antes de publicar (no negociable)
 Si cualquier paso falla, no se publica.
-1. **Borrador interno ≠ texto final.** Las notas, `[TBD: ...]`, alternativas (opción A/B), alt text, etiquetas de slide e indicaciones de producción viven en el borrador interno, marcado como NO PUBLICABLE. Lo que se programa es un archivo que contiene exactamente el texto a publicar, nada más (en X, el link va en un archivo aparte para el primer reply).
-2. **Falta un dato = NO se publica.** Cualquier `[TBD]` o dato faltante bloquea. Nunca se rellena el hueco con un placeholder en el texto final: se saca esa parte o se saltea el post.
+1. **Borrador interno ≠ texto final.** Las notas, `[FALTA-DATO: ...]`, alternativas (opción A/B), alt text, etiquetas de slide e indicaciones de producción viven en el borrador interno, marcado como NO PUBLICABLE. Lo que se programa es un archivo que contiene exactamente el texto a publicar, nada más (en X, el link va en un archivo aparte para el primer reply).
+2. **Falta un dato = NO se publica.** Cualquier `[FALTA-DATO]` o dato faltante bloquea. Nunca se rellena el hueco con un placeholder en el texto final: se saca esa parte o se saltea el post.
 3. **Chequeo automático** sobre el texto final exacto:
    `python3 content-tools/prepublish_check.py --network ig|x --file post.txt [--style spotlight] [--event-date AAAA-MM-DD --event-time HH:MM] [--reply-file reply.txt]`
    Tiene que decir **PASS** (exit 0). Cualquier FAIL o error = no se publica. Los WARN (largo recomendado, gancho) se revisan a mano.
@@ -56,7 +56,7 @@ Si cualquier paso falla, no se publica.
 - Se opera en **español**. Mails a empresas de EE.UU. en **inglés**; a destinatarios argentinos, en español rioplatense (vos, cálido, "che" con moderación).
 - La comunidad se escribe SIEMPRE "mardelplata.dev.ar". Firma: "Luigi Canoro · mardelplata.dev.ar".
 - Corto, cálido, directo: máx. ~120 palabras por mail (primer contacto: menos de 90).
-- Nunca inventar métricas (asistentes, alcance, seguidores) ni datos. Si falta algo, `[TBD: ...]` SOLO en borradores internos.
+- Nunca inventar métricas (asistentes, alcance, seguidores) ni datos. Si falta algo, `[FALTA-DATO: ...]` SOLO en borradores internos.
 - Pasar todo el copy por `qa-texto-anti-tropes-llm`.
 
 ## Registro

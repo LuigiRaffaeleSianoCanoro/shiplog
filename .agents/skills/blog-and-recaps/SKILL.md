@@ -19,7 +19,7 @@ Versión en inglés solo si Luigi la pide.
 Si el tema necesita datos actuales, búsqueda/fetch web y citar links. Primera persona del plural ("armamos", "aprendimos").
 
 ## Reglas propias
-- Números (asistentes, inscriptos) solo si Luigi los dio; si no, `[TBD]` en el borrador.
+- Números (asistentes, inscriptos) solo si Luigi los dio; si no, `[FALTA-DATO]` en el borrador.
 - Borrador para revisión; nunca publicar en el sitio ni en redes.
 - Pasar por `qa-texto-anti-tropes-llm` y `ai-copywriter` (sin correctio, sin "bitácora", sin vocabulario IA).
 - Fotos de personas: solo con consentimiento; nunca retocarlas con IA.

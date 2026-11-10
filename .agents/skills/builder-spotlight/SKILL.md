@@ -53,6 +53,6 @@ Apertura alternativa: "Seguimos mostrando el talento tech de Mar del Plata. Hoy:
 
 ## Reglas propias
 - Nunca copiar teléfonos, emails ni la foto de Drive en los textos; usar el nombre como pidió aparecer.
-- Solo hechos con fuente; citas textuales solo si el builder las dio. Si no hay cita, en el borrador interno se marca `[TBD: cita]`, pero el post final se arma sin esa parte (apertura alternativa) o no se publica.
+- Solo hechos con fuente; citas textuales solo si el builder las dio. Si no hay cita, en el borrador interno se marca `[FALTA-DATO: cita]`, pero el post final se arma sin esa parte (apertura alternativa) o no se publica.
 - No se usa su foto sin OK. Foto real: recorte limpio, nunca retocada ni regenerada con IA.
 - Nada se publica sin el OK explícito de Luigi. Reglas por red y compuerta: ver `social-promotion`.
