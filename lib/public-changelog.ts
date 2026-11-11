@@ -2,6 +2,7 @@ import { cache } from "react";
 import { EMPTY, SECTIONS, type Section } from "./changelog";
 import { loadRepoConfig } from "./repo-config";
 import type { Store } from "./store";
+import { isStoreAuthError } from "./store/store-auth-error";
 
 const SEG = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 
@@ -165,6 +166,25 @@ async function resolvePublicChangelogUncached(namespace: string, repo: string, s
 
 /** Active installation for namespace plus stored changelog markdown (defaults to EMPTY). */
 export const resolvePublicChangelog = cache(resolvePublicChangelogUncached);
+
+export type PublicChangelogLoad =
+  | { status: "ok"; data: ResolvedPublicChangelog }
+  | { status: "not_found" }
+  | { status: "store_unavailable" };
+
+export async function loadPublicChangelog(
+  namespace: string,
+  repo: string,
+  store: Store,
+): Promise<PublicChangelogLoad> {
+  try {
+    const data = await resolvePublicChangelogUncached(namespace, repo, store);
+    return data ? { status: "ok", data } : { status: "not_found" };
+  } catch (err) {
+    if (isStoreAuthError(err)) return { status: "store_unavailable" };
+    throw err;
+  }
+}
 
 export function publicPageTitle(namespace: string, repo: string) {
   return `${repo} changelog`;

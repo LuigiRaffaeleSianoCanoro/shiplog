@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { del, get, list, put } from "@vercel/blob";
+import { BlobNotFoundError, del, get, head, list, put } from "@vercel/blob";
+import { StoreAuthError } from "./store-auth-error";
 import { pickNewestActiveInstallation } from "../installation-namespace";
 import type { Installation, Job, Outbox, Store, UserKey } from "./types";
 
@@ -19,8 +20,42 @@ function changelogKeyFromPathname(pathname: string): string | null {
 }
 const opts = { access: "private" as const, contentType: "application/json", addRandomSuffix: false, cacheControlMaxAge: 60 };
 
+function isBlobGet403(err: unknown): boolean {
+  return err instanceof Error && /Failed to fetch blob:\s*403\b/i.test(err.message);
+}
+
+function pathnamePrefix(pathname: string): string {
+  const slash = pathname.lastIndexOf("/");
+  return slash >= 0 ? `${pathname.slice(0, slash + 1)}` : pathname;
+}
+
+function logBlobForbidden(pathname: string, kind: "missing" | "auth") {
+  console.log(JSON.stringify({ event: "blob_read_forbidden", pathnamePrefix: pathnamePrefix(pathname), kind }));
+}
+
 async function readJson<T>(pathname: string): Promise<T | null> {
-  const r = await get(pathname, { access: "private", useCache: false });
+  let r: Awaited<ReturnType<typeof get>>;
+  try {
+    r = await get(pathname, { access: "private", useCache: false });
+  } catch (err) {
+    if (!isBlobGet403(err)) throw err;
+    try {
+      await head(pathname);
+      logBlobForbidden(pathname, "auth");
+      throw new StoreAuthError(pathnamePrefix(pathname));
+    } catch (headErr) {
+      if (headErr instanceof StoreAuthError) throw headErr;
+      if (headErr instanceof BlobNotFoundError) {
+        logBlobForbidden(pathname, "missing");
+        return null;
+      }
+      if (isBlobGet403(headErr)) {
+        logBlobForbidden(pathname, "auth");
+        throw new StoreAuthError(pathnamePrefix(pathname));
+      }
+      throw headErr;
+    }
+  }
   if (!r || !r.stream) return null;
   return JSON.parse(await new Response(r.stream as ReadableStream).text()) as T;
 }
