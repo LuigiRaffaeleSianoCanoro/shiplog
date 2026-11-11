@@ -28,7 +28,7 @@ Run your own private Shiplog instance for your Cursor Origin namespace. This gui
 
 Use the **Deploy to Vercel** button in the [README](../README.md#self-host), or import the repository manually.
 
-1. Create a new Vercel project from `https://github.com/LuigiRaffaeleSianoCanoro/shiplog` (branch `feat/mvp` until it merges to `main`).
+1. Create a new Vercel project from `https://github.com/LuigiRaffaeleSianoCanoro/shiplog` (default branch `main`).
 2. Framework preset: **Next.js**. Root directory: repository root. Build command `npm run build`, install `npm i`.
 3. In the Vercel project, open **Storage**, create a **Blob** store, set it to **private**, and **connect** it to this project. Vercel injects `BLOB_READ_WRITE_TOKEN` (and may set `BLOB_STORE_ID`). You do not paste those manually.
 4. After the first deploy, note your production URL (for example `https://shiplog-yourname.vercel.app`). You will use it for `SHIPLOG_INSTALL_ORIGIN` and for the Origin app URLs in step 1.
