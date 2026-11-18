@@ -44,6 +44,39 @@ function jobProps(job: Job): Record<string, unknown> {
   };
 }
 
+/** Post-response analytics so ISR pages never call `headers()` during render. */
+export function schedulePublicChangelogViewed(repoSlug: string): void {
+  try {
+    after(async () => {
+      const { headers } = await import("next/headers");
+      const ua = (await headers()).get("user-agent");
+      await trackPublicChangelogViewed(repoSlug, ua);
+    });
+  } catch {
+    void trackPublicChangelogViewed(repoSlug, null);
+  }
+}
+
+export function scheduleFeedRead(format: "json" | "xml", repoSlug: string, userAgent: string | null): void {
+  try {
+    after(() => trackFeedRead(format, repoSlug, userAgent));
+  } catch {
+    void trackFeedRead(format, repoSlug, userAgent);
+  }
+}
+
+export function scheduleApiRead(
+  endpoint: "changelog" | "release" | "packages",
+  repoSlug: string,
+  userAgent: string | null,
+): void {
+  try {
+    after(() => trackApiRead(endpoint, repoSlug, userAgent));
+  } catch {
+    void trackApiRead(endpoint, repoSlug, userAgent);
+  }
+}
+
 export async function trackPublicChangelogViewed(repoSlug: string, userAgent: string | null): Promise<void> {
   await captureServerEvent(AnalyticsEvents.publicChangelogViewed, {
     repo: repoSlug,
