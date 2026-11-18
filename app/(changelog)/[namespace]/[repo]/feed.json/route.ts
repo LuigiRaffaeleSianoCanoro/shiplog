@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { buildJsonFeed, buildPublicMeta, resolvePublicChangelog } from "@/lib/public-changelog";
-import { trackFeedRead } from "@/lib/analytics/track";
-import { requestOrigin } from "@/lib/request-origin";
+import { scheduleFeedRead } from "@/lib/analytics/track";
+import { publicSiteOrigin } from "@/lib/request-origin";
 import { getStore } from "@/lib/store";
 
 export const revalidate = 300;
@@ -12,8 +12,8 @@ export async function GET(req: Request, ctx: Ctx) {
   const { namespace, repo } = await ctx.params;
   const data = await resolvePublicChangelog(namespace, repo, getStore());
   if (!data) notFound();
-  await trackFeedRead("json", data.repoSlug, req.headers.get("user-agent"));
-  const origin = await requestOrigin();
+  scheduleFeedRead("json", data.repoSlug, req.headers.get("user-agent"));
+  const origin = publicSiteOrigin();
   const meta = buildPublicMeta(origin, namespace, repo);
   const body = JSON.stringify(buildJsonFeed(data.document, meta), null, 2);
   return new Response(body, {

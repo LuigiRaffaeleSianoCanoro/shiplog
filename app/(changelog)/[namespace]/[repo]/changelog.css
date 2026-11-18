@@ -8,7 +8,7 @@
   min-height: 100vh;
   background: var(--harbor-bg);
   color: var(--harbor-text);
-  font-family: var(--font-changelog-body), system-ui, sans-serif;
+  font-family: var(--font-manrope), system-ui, sans-serif;
 }
 .changelog-root a { color: var(--harbor-lime); text-decoration: none; }
 .changelog-root a:hover { text-decoration: underline; }
@@ -29,7 +29,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: var(--font-changelog-display), sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-weight: 600;
   font-size: 0.95rem;
   letter-spacing: 0.06em;
@@ -44,7 +44,7 @@
 .ch-nav a:hover { color: var(--harbor-lime); }
 .ch-wrap { max-width: 720px; margin: 0 auto; padding: 40px 24px 64px; }
 .ch-title {
-  font-family: var(--font-changelog-display), sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: clamp(2rem, 5vw, 2.75rem);
   font-weight: 600;
   text-transform: uppercase;
@@ -61,7 +61,7 @@
   margin-bottom: 20px;
 }
 .ch-release h2 {
-  font-family: var(--font-changelog-display), sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 1.35rem;
   font-weight: 600;
   margin: 0 0 4px;
@@ -71,7 +71,7 @@
 .ch-release .ch-date { color: var(--harbor-muted); font-size: 0.85rem; margin-bottom: 12px; }
 .ch-release .ch-summary { margin-bottom: 16px; line-height: 1.55; color: #d4d4d8; }
 .ch-release h3 {
-  font-family: var(--font-changelog-display), sans-serif;
+  font-family: var(--font-display), sans-serif;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
