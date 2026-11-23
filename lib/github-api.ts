@@ -1,3 +1,4 @@
+import { prAuthor, type GhUser } from "./github-author";
 import { env } from "./env";
 import { githubAppJwt, githubConfigured } from "./github";
 import type { HistoricalPr, HistoricalTag } from "./history";
@@ -210,7 +211,7 @@ export async function githubListMergedPullRequests(installationId: string, repo:
       body?: string;
       merged_at?: string | null;
       labels?: { name?: string }[];
-      user?: { login?: string };
+      user?: GhUser;
     }[];
     if (!prs.length) break;
     for (const pr of prs) {
@@ -221,7 +222,7 @@ export async function githubListMergedPullRequests(installationId: string, repo:
         body: pr.body ?? "",
         mergedAt: pr.merged_at,
         labels: pr.labels?.map((l) => (l.name ? { name: l.name } : null)).filter(Boolean) as { name: string }[],
-        author: pr.user,
+        author: prAuthor(pr.user),
       });
     }
     if (prs.length < 100) break;
