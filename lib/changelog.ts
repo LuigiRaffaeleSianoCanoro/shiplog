@@ -172,7 +172,7 @@ export function bumpNote(md: string | null, requested: string): string | null {
 }
 
 /** A merged PR waiting for its batch agent (stored as JSON in the queued job's result). */
-export interface QueuedEntry { number: string; url: string; title: string; body: string; section: Section | null; entry?: string; breaking: boolean; changelogPaths?: string[]; /** Authored by a bot account (grouped when `group_bots` is on). */ bot?: boolean; /** When the stale-queue reminder mentioned this PR. */ staleNotifiedAt?: string; /** Failed batch launches so far; part of the claim key so a failed launch can be retried. */ flushAttempts?: number }
+export interface QueuedEntry { number: string; url: string; title: string; body: string; section: Section | null; entry?: string; breaking: boolean; changelogPaths?: string[]; /** Authored by a bot account (grouped when `group_bots` is on). */ bot?: boolean; /** When the stale-queue reminder mentioned this PR. */ staleNotifiedAt?: string }
 
 /** Neon test storage key: one document per repo, or per repo plus changelog path in monorepos. */
 export function neonChangelogKey(repo: string, changelogPath: string): string {

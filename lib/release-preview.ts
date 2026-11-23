@@ -63,7 +63,7 @@ const DEFAULT_FILE = "default";
 function queuedEntry(j: Job): (QueuedEntry & { batch?: string }) | null {
   try {
     const e = JSON.parse(j.result ?? "");
-    return e && typeof e === "object" && typeof e.title === "string" && (e.batch === "release" || e.batch === "daily") ? e : null;
+    return e && typeof e === "object" && typeof e.title === "string" && (e.batch === undefined || e.batch === "release" || e.batch === "daily") ? e : null;
   } catch { return null; }
 }
 

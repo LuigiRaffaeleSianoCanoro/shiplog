@@ -3,13 +3,15 @@ import type { RepoReleasePreview } from "@/lib/release-preview";
 /** Who may start a manual flush for an installation: only its own install session, and only with a Cursor key. */
 export type FlushAccess = { kind: "ready"; keyLast4: string } | { kind: "no_key" } | null;
 
-export interface FlushNotice { status: string; repo: string; prs?: number; runs?: number }
+export interface FlushNotice { status: string; repo: string; prs?: number; runs?: number; failed?: number }
 
 const runs = (n: number) => `${n} agent run${n === 1 ? "" : "s"}`;
 
 function noticeText(n: FlushNotice): { text: string; ok: boolean } | null {
   switch (n.status) {
-    case "launched": return { ok: true, text: `Started ${runs(n.runs ?? 1)} for ${n.prs ?? 0} queued PR${n.prs === 1 ? "" : "s"} in ${n.repo}. A changelog PR will follow.` };
+    case "launched": return n.failed
+      ? { ok: false, text: `Started ${runs(n.runs ?? 1)} for ${n.repo}, but ${n.failed} changelog file${n.failed === 1 ? "" : "s"} failed to start. Those PRs stay queued for the failed file${n.failed === 1 ? "" : "s"}; try again.` }
+      : { ok: true, text: `Started ${runs(n.runs ?? 1)} for ${n.prs ?? 0} queued PR${n.prs === 1 ? "" : "s"} in ${n.repo}. A changelog PR will follow.` };
     case "empty": return { ok: true, text: `Nothing is queued for ${n.repo} any more. Another run may already have picked it up.` };
     case "no_key": return { ok: false, text: `${n.repo} needs a Cursor key before a batch can run.` };
     case "busy": return { ok: true, text: `Another run is already starting for ${n.repo}. Refresh in a minute to see it under Recent jobs.` };

@@ -416,54 +416,45 @@ function groupByChangelog(queued: Job[]): BatchGroup[] {
 }
 
 /**
- * One agent per group, adding the queued PRs under [Unreleased] (no version cut).
- * Before launching, each job is claimed with an atomic store write (`claimDelivery`), so overlapping cron runs, double clicks
- * or a click during the cron never launch twice for the same PR, across instances too. A failed launch bumps the job's
- * attempt counter, which changes its claim key, so the next try can claim it again.
+ * One agent per group, adding the queued PRs under [Unreleased] (no version cut). Callers hold the cron poll lock, so the
+ * daily cron and a dashboard click never run this at the same time. Each group re-reads its jobs first.
+ * A PR in several changelog files stays queued, with the files still to do, until every file's run has launched;
+ * a failed launch leaves exactly the failed files queued for the next try.
  */
-async function launchBatches(groups: BatchGroup[], stillQueued: (j: Job) => boolean): Promise<{ launched: number; prs: number; contended: number }> {
+async function launchBatches(groups: BatchGroup[], stillQueued: (j: Job) => boolean): Promise<{ launched: number; prs: number; failed: number }> {
   const store = getStore();
-  let launched = 0, contended = 0;
-  const flushed = new Set<string>(); // claimed and launched by this call (a PR can span several package changelogs)
-  const failed = new Set<string>();
-  // Entries as first read: once a PR is batched for one changelog file its record says "batched into …",
-  // so later files of the same PR must use this copy (before, a monorepo PR's second package was silently dropped).
-  const entryById = new Map(groups.flatMap((g) => g.jobs.map((j) => [j.id, entryOf(j)] as const)));
+  let launched = 0, failed = 0;
+  const done = new Set<string>();
   for (const { installationId, repo, path, jobs: grp } of groups) {
     const ids = new Set(grp.map((j) => j.id));
-    const live = (await store.listJobs()).filter((j) => ids.has(j.id) && !failed.has(j.id) && (flushed.has(j.id) || (j.status === "queued" && stillQueued(j))))
+    const live = (await store.listJobs()).filter((j) => ids.has(j.id) && j.status === "queued" && stillQueued(j))
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     if (!live.length) continue;
-    const key = await userKey(installationId).catch(() => null);
-    if (!key) continue;
-    const mine: Job[] = [];
-    for (const j of live) {
-      if (flushed.has(j.id) || (await store.claimDelivery(`batch-claim:${j.id}:${entryOf(j).flushAttempts ?? 0}`))) mine.push(j);
-      else contended++;
-    }
-    if (!mine.length) continue;
     try {
+      const key = await userKey(installationId);
+      if (!key) continue;
       const cfg = await loadRepoConfig(installationId, repo);
       const changelogPath = path === "__default__" ? cfg.changelogPath : path;
-      const entries = mine.map((j) => entryById.get(j.id) ?? entryOf(j));
+      const entries = live.map(entryOf);
       const l = await launchAgent(key, batchPrompt(repo, entries, styleOf(cfg, changelogPath), undefined, undefined, changelogPath, { groupBots: cfg.groupBots }), repoUrl(repo));
       const job: Job = { id: randomUUID(), deliveryId: `batch-${randomUUID()}`, installationId, repo, prNumber: "", prUrl: repoUrl(repo), kind: "changelog", mode: "cursor", status: "running", agentId: l.agentId, runId: l.runId, changelogPaths: [changelogPath], result: `agent ${l.agentId} (${entries.length} queued PRs)`, createdAt: new Date().toISOString() };
       await store.putJob(job);
-      for (const j of mine) flushed.add(j.id);
-      await markBatched(mine, job.id);
+      const finished: Job[] = [];
+      for (const j of live) {
+        const e = entryOf(j);
+        const rest = (e.changelogPaths ?? []).filter((p) => p !== path);
+        if (path !== "__default__" && rest.length) { j.result = JSON.stringify({ ...e, changelogPaths: rest }); await store.putJob(j); }
+        else finished.push(j);
+      }
+      await markBatched(finished, job.id);
+      for (const j of live) done.add(j.id);
       launched++;
     } catch (e) {
+      failed++;
       console.error("[shiplog] batch flush failed:", (e as Error).message);
-      for (const j of mine) {
-        if (flushed.has(j.id)) continue; // already in another changelog's run; leave it batched
-        failed.add(j.id);
-        const e2 = entryOf(j);
-        j.result = JSON.stringify({ ...e2, flushAttempts: (e2.flushAttempts ?? 0) + 1 });
-        await store.putJob(j).catch(() => {});
-      }
     }
   }
-  return { launched, prs: flushed.size, contended };
+  return { launched, prs: done.size, failed };
 }
 
 /** Daily batches (cron): one agent per repo and changelog file for PRs queued with `batch: daily`. Returns agents launched. */
@@ -472,13 +463,18 @@ export async function flushBatches(): Promise<number> {
   return (await launchBatches(groupByChangelog(daily), (j) => batchOf(j) === "daily")).launched;
 }
 
-export type FlushResult = { status: "launched"; agentRuns: number; prs: number } | { status: "empty" } | { status: "no_key" } | { status: "busy" } | { status: "failed" };
+export type FlushResult =
+  | { status: "launched"; agentRuns: number; prs: number; /** Changelog files whose run failed to start; their PRs stay queued for them. */ failedRuns: number }
+  | { status: "empty" } | { status: "no_key" } | { status: "busy" } | { status: "failed" };
 
-/** Queued for a batch (release or daily) with a readable entry; other queued records are never swept into a manual flush. */
+/** How long a manual flush may hold the cron poll lock before it counts as abandoned. */
+const FLUSH_LOCK_TTL_MS = 120_000;
+
+/** Queued for a batch with a readable entry. Records from before `batch` was stored count as release batches. */
 function isBatchQueued(j: Job): boolean {
   if (j.status !== "queued") return false;
   const b = batchOf(j);
-  return (b === "release" || b === "daily") && typeof entryOf(j).title === "string";
+  return (b === "" || b === "release" || b === "daily") && typeof entryOf(j).title === "string";
 }
 
 /**
@@ -486,14 +482,20 @@ function isBatchQueued(j: Job): boolean {
  * billed to the installation's Cursor key. Adds them under [Unreleased]; cutting a version stays `/shiplog release`.
  */
 export async function flushRepoNow(installationId: string, repo: string): Promise<FlushResult> {
-  const queued = (await getStore().listJobs(installationId)).filter((j) => j.repo === repo && isBatchQueued(j));
-  if (!queued.length) return { status: "empty" };
+  const store = getStore();
+  const queuedNow = async () => (await store.listJobs(installationId)).filter((j) => j.repo === repo && isBatchQueued(j));
+  if (!(await queuedNow()).length) return { status: "empty" };
   if (!(await userKey(installationId))) return { status: "no_key" };
-  const { launched, prs, contended } = await launchBatches(groupByChangelog(queued), isBatchQueued);
-  if (launched) return { status: "launched", agentRuns: launched, prs };
-  if (contended) return { status: "busy" };
-  const left = (await getStore().listJobs(installationId)).some((j) => j.repo === repo && isBatchQueued(j));
-  return left ? { status: "failed" } : { status: "empty" };
+  // Same lock as the cron poll: a click during the cron, or two clicks at once, wait instead of launching twice. The TTL frees it after a crash.
+  if (!(await store.acquireCronPollLock(FLUSH_LOCK_TTL_MS))) return { status: "busy" };
+  try {
+    const queued = await queuedNow();
+    if (!queued.length) return { status: "empty" };
+    const { launched, prs, failed } = await launchBatches(groupByChangelog(queued), isBatchQueued);
+    return launched ? { status: "launched", agentRuns: launched, prs, failedRuns: failed } : { status: "failed" };
+  } finally {
+    await store.releaseCronPollLock();
+  }
 }
 
 /** Days a queued PR may wait before recovery. SHIPLOG_QUEUE_STALE_DAYS, default 14; 0 turns recovery off. */

@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { COOKIE } from "@/lib/session";
 import { generateKeyPairSync, randomBytes } from "node:crypto";
 
 const master = randomBytes(32).toString("base64");
@@ -48,7 +49,7 @@ describe("manual batch flush (backlog 10)", () => {
     const { store, jobs, launches } = await setup("batch: release\n");
     await queueTwo(jobs);
     const r = await jobs.flushRepoNow("i_1", "luigi/demo");
-    expect(r).toEqual({ status: "launched", agentRuns: 1, prs: 2 });
+    expect(r).toEqual({ status: "launched", agentRuns: 1, prs: 2, failedRuns: 0 });
     expect(launches()).toBe(1);
     const all = await store.listJobs("i_1");
     const batch = all.find((j: any) => j.status === "running")!;
@@ -96,7 +97,20 @@ describe("manual batch flush (backlog 10)", () => {
   it("the daily cron and a click at the same time launch one agent", async () => {
     const { jobs, launches } = await setup("batch: daily\n");
     await queueTwo(jobs);
-    await Promise.all([jobs.flushBatches(), jobs.flushRepoNow("i_1", "luigi/demo")]);
+    const { runCronPoll } = await import("@/lib/cronPoll");
+    const [cron, click] = await Promise.all([runCronPoll(), jobs.flushRepoNow("i_1", "luigi/demo")]);
+    expect(launches()).toBe(1);
+    expect(cron.skipped === true || click.status === "busy").toBe(true);
+  });
+
+  it("an abandoned lock (crashed flush) expires instead of wedging the repo", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const { store, jobs, launches } = await setup("batch: release\n");
+    await queueTwo(jobs);
+    expect(await store.acquireCronPollLock(120_000)).toBe(true); // a flush that never released
+    expect(await jobs.flushRepoNow("i_1", "luigi/demo")).toEqual({ status: "busy" });
+    vi.setSystemTime(Date.now() + 121_000);
+    expect(await jobs.flushRepoNow("i_1", "luigi/demo")).toMatchObject({ status: "launched" });
     expect(launches()).toBe(1);
   });
 
@@ -122,8 +136,36 @@ describe("manual batch flush (backlog 10)", () => {
     const { releasePreviews } = await import("@/lib/release-preview");
     const [p] = releasePreviews(await store.listJobs("i_1"), () => false);
     expect(p.changelogFiles).toHaveLength(3);
-    expect(await jobs.flushRepoNow("i_1", "luigi/demo")).toEqual({ status: "launched", agentRuns: 3, prs: 2 });
+    expect(await jobs.flushRepoNow("i_1", "luigi/demo")).toEqual({ status: "launched", agentRuns: 3, prs: 2, failedRuns: 0 });
     expect(launches()).toBe(3);
+    expect(p.changelogFiles).toContain("default");
+  });
+
+  it("monorepo partial failure: the failed file stays queued and the retry runs only that file", async () => {
+    const { store, jobs, launches } = await setup("batch: release\n");
+    await store.putJob({ id: "m1", deliveryId: "m1", installationId: "i_1", repo: "luigi/demo", prNumber: "1", prUrl: "", kind: "changelog", mode: "cursor", status: "queued", createdAt: new Date().toISOString(),
+      result: JSON.stringify({ number: "1", url: "", title: "feat: shared", body: "", section: null, breaking: false, batch: "release", changelogPaths: ["packages/a/CHANGELOG.md", "packages/b/CHANGELOG.md"] }) });
+    const f = globalThis.fetch as any;
+    const ok = f.getMockImplementation();
+    f.mockImplementation(async (url: string, init?: any) => (String(url).endsWith("/v1/agents") && String(init?.body).includes("packages/b/CHANGELOG.md") ? new Response("boom", { status: 500 }) : ok(url, init)));
+    expect(await jobs.flushRepoNow("i_1", "luigi/demo")).toEqual({ status: "launched", agentRuns: 1, prs: 1, failedRuns: 1 });
+    const left = (await store.listJobs("i_1")).find((j: any) => j.id === "m1")!;
+    expect(left.status).toBe("queued");
+    expect(JSON.parse(left.result!).changelogPaths).toEqual(["packages/b/CHANGELOG.md"]);
+    f.mockImplementation(ok);
+    const before = launches();
+    expect(await jobs.flushRepoNow("i_1", "luigi/demo")).toEqual({ status: "launched", agentRuns: 1, prs: 1, failedRuns: 0 });
+    expect(launches() - before).toBe(1);
+    const last = f.mock.calls.filter((c: any) => String(c[0]).endsWith("/v1/agents")).at(-1);
+    expect(JSON.parse(last[1].body).prompt.text).toContain("packages/b/CHANGELOG.md");
+    expect((await store.listJobs("i_1")).find((j: any) => j.id === "m1")!.status).toBe("done");
+  });
+
+  it("queued records from before the batch field was stored still flush", async () => {
+    const { store, jobs } = await setup("batch: release\n");
+    await store.putJob({ id: "old", deliveryId: "old", installationId: "i_1", repo: "luigi/demo", prNumber: "3", prUrl: "", kind: "changelog", mode: "cursor", status: "queued", createdAt: new Date().toISOString(),
+      result: JSON.stringify({ number: "3", url: "", title: "feat: legacy", body: "", section: null, breaking: false }) });
+    expect(await jobs.flushRepoNow("i_1", "luigi/demo")).toMatchObject({ status: "launched", prs: 1 });
   });
 
   it("daily cron, monorepo: a PR in two package changelogs reaches both runs (regression)", async () => {
@@ -156,7 +198,8 @@ describe("manual batch flush (backlog 10)", () => {
 describe("POST /api/batch/flush", () => {
   // The cookie jar is read per request, so one mocked module serves every session in a test.
   let cookie: string | undefined;
-  vi.doMock("next/headers", () => ({ cookies: async () => ({ get: (n: string) => (n === "shiplog_inst" && cookie ? { value: cookie } : undefined) }) }));
+  beforeAll(() => { vi.doMock("next/headers", () => ({ cookies: async () => ({ get: (n: string) => (n === COOKIE && cookie ? { value: cookie } : undefined) }) })); });
+  afterAll(() => { vi.doUnmock("next/headers"); });
   async function post(form: Record<string, string>, opts: { session?: string; origin?: string; headers?: Record<string, string>; url?: string } = {}) {
     const { signSession } = await import("@/lib/session");
     cookie = opts.session ? signSession(opts.session) : undefined;
@@ -169,7 +212,8 @@ describe("POST /api/batch/flush", () => {
     await queueTwo(jobs);
     const res = await post({ installationId: "i_1", repo: "luigi/demo" }, { session: "i_1", origin: "http://localhost:3000" });
     expect(res.status).toBe(303);
-    const loc = new URL(res.headers.get("location")!);
+    expect(res.headers.get("location")!.startsWith("/dashboard?")).toBe(true); // relative: can't point at another host
+    const loc = new URL(res.headers.get("location")!, "http://localhost:3000");
     expect(loc.pathname).toBe("/dashboard");
     expect(Object.fromEntries(loc.searchParams)).toEqual({ installation_id: "i_1", flush: "launched", repo: "luigi/demo", prs: "2", runs: "1" });
     expect(loc.hash).toBe("#release-preview");
@@ -187,13 +231,15 @@ describe("POST /api/batch/flush", () => {
     expect(launches()).toBe(0);
   });
 
-  it("behind a TLS proxy the browser's https origin is accepted and the redirect stays public", async () => {
+  it("behind a proxy: the Host the browser used is accepted; forged x-forwarded-host neither passes nor steers the redirect", async () => {
     const { jobs, launches } = await setup("batch: release\n");
     await queueTwo(jobs);
-    const res = await post({ installationId: "i_1", repo: "luigi/demo" }, { session: "i_1", origin: "https://shiplog.example", url: "http://10.0.0.5:3000/api/batch/flush", headers: { "x-forwarded-host": "shiplog.example", "x-forwarded-proto": "https" } });
-    expect(res.status).toBe(303);
-    expect(res.headers.get("location")).toMatch(/^https:\/\/shiplog\.example\/dashboard\?/);
+    const ok = await post({ installationId: "i_1", repo: "luigi/demo" }, { session: "i_1", origin: "https://shiplog.example", url: "http://10.0.0.5:3000/api/batch/flush", headers: { host: "shiplog.example" } });
+    expect(ok.status).toBe(303);
+    expect(ok.headers.get("location")).toMatch(/^\/dashboard\?/);
     expect(launches()).toBe(1);
+    const forged = await post({ installationId: "i_1", repo: "luigi/demo" }, { session: "i_1", origin: "https://evil.example", headers: { host: "shiplog.example", "x-forwarded-host": "evil.example" } });
+    expect(forged.status).toBe(403);
   });
 
   it("a disconnected installation launches nothing", async () => {

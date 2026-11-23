@@ -172,6 +172,10 @@ describe("dashboard page renders the release preview", () => {
     expect(ok.panel.replace(/<!-- -->/g, "")).toContain("Started 1 agent run for 4 queued PRs in acme/web. A changelog PR will follow.");
     const bad = await render({ installation_id: "i1", flush: "failed", repo: "acme/web" }, "i1", [], { key: true });
     expect(bad.panel.replace(/<!-- -->/g, "")).toContain("The PRs are still queued");
+    const busy = await render({ installation_id: "i1", flush: "busy", repo: "acme/web" }, "i1", [], { key: true });
+    expect(busy.panel.replace(/<!-- -->/g, "")).toContain("Another run is already starting for acme/web");
+    const partial = await render({ installation_id: "i1", flush: "launched", repo: "acme/web", prs: "1", runs: "1", failed: "1" }, "i1", [], { key: true });
+    expect(partial.panel.replace(/<!-- -->/g, "")).toContain("1 changelog file failed to start");
     const forged = await render({ installation_id: "i1", flush: "launched", repo: "<script>" }, undefined);
     expect(forged.html).not.toContain("Started");
   });

@@ -14,8 +14,8 @@ import { ReleasePreview, type FlushAccess } from "./ReleasePreview";
 export const dynamic = "force-dynamic";
 const PREVIEW_CONFIG_REPOS = 20;
 
-export default async function Dashboard({ searchParams }: { searchParams: Promise<{ installation_id?: string; token?: string; flush?: string; repo?: string; prs?: string; runs?: string }> }) {
-  const { installation_id, token, flush, repo: flushRepo, prs, runs } = await searchParams;
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ installation_id?: string; token?: string; flush?: string; repo?: string; prs?: string; runs?: string; failed?: string }> }) {
+  const { installation_id, token, flush, repo: flushRepo, prs, runs, failed } = await searchParams;
   const store = getStore();
   // Scoped view needs the install session for that installation; the overview needs the operator token.
   const scoped = installation_id ?? null;
@@ -38,7 +38,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   // "Run batch now" spends the installation's own key, so it shows only in that installation's session view (never the operator overview).
   const sessionKey = scoped && session === scoped ? await store.getKey(scoped) : null;
   const flushAccess = (inst: string): FlushAccess => (scoped && session === scoped && inst === scoped ? (sessionKey ? { kind: "ready", keyLast4: sessionKey.last4 } : { kind: "no_key" }) : null);
-  const notice = flush && flushRepo && scoped && session === scoped ? { status: flush, repo: flushRepo, prs: Number(prs) || undefined, runs: Number(runs) || undefined } : null;
+  const notice = flush && flushRepo && scoped && session === scoped ? { status: flush, repo: flushRepo, prs: Number(prs) || undefined, runs: Number(runs) || undefined, failed: Number(failed) || undefined } : null;
   const previews = releasePreviews(allJobs, (inst, repo) => groupBots.get(`${inst}\t${repo}`) ?? false);
   const outbox = (await store.listOutbox(scoped ?? undefined)).slice(0, 5);
   return (
