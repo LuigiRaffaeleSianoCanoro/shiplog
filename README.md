@@ -72,10 +72,11 @@ The same changelog data as the public page (`/{namespace}/{repo}`) is available 
 - `GET /api/v1/changelogs/{namespace}/{repo}/releases/{version}` — one release (`version` may include or omit a `v` prefix).
 - `GET /api/v1/changelogs/{namespace}/{repo}/packages` — root flag plus monorepo changelog paths discovered in storage (excludes notes and notify blobs).
 
-Machine-readable contract: [docs/openapi/v1-changelogs.yaml](docs/openapi/v1-changelogs.yaml) (OpenAPI 3.1). `test/openapi-drift.test.ts` fails if a route response stops matching it.
 - Monorepo: add `?changelog=packages/web/CHANGELOG.md` on the changelog or release endpoints.
 
-Responses use `Cache-Control: public, max-age=60, stale-while-revalidate=300`.
+Successful responses use `Cache-Control: public, s-maxage=300, stale-while-revalidate=600`. A 503 `store_unavailable` uses `no-store`.
+
+Machine-readable contract: [docs/openapi/v1-changelogs.yaml](docs/openapi/v1-changelogs.yaml) (OpenAPI 3.1). `test/openapi-drift.test.ts` calls the real routes and fails when a response stops matching it.
 
 Example:
 

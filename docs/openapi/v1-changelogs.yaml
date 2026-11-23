@@ -82,12 +82,9 @@ paths:
           content:
             application/json:
               schema:
-                description: "`not_found` for an unknown repo, `release_not_found` (with `version`) for an unknown release."
-                type: object
-                properties:
-                  error: { type: string, enum: [not_found, release_not_found] }
-                  version: { type: string }
-                required: [error]
+                oneOf:
+                  - $ref: "#/components/schemas/NotFoundError"
+                  - $ref: "#/components/schemas/ReleaseNotFoundError"
         "503":
           $ref: "#/components/responses/StoreUnavailable"
 components:
@@ -190,12 +187,14 @@ components:
       required: [error]
       properties:
         error: { type: string, const: not_found }
+      additionalProperties: false
     ReleaseNotFoundError:
       type: object
       required: [error, version]
       properties:
         error: { type: string, const: release_not_found }
         version: { type: string }
+      additionalProperties: false
     StoreUnavailableError:
       type: object
       required: [error]
