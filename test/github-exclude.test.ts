@@ -18,9 +18,15 @@ describe("GitHub PRs carry labels and author into exclude rules", () => {
     expect(excludedBy(pr, parseConfig(""))).toBe("label no-changelog");
   });
 
-  it("exclude.labels matches GitHub labels", () => {
+  it("the default exclude label skip-changelog matches case-insensitively", () => {
     const pr = mergedGh({ labels: [{ name: "Skip-Changelog" }], user: human }).event.payload.pullRequest;
     expect(excludedBy(pr, parseConfig(""))).toBe("label skip-changelog");
+  });
+
+  it("a configured exclude.labels entry matches a GitHub label; other labels do not", () => {
+    const cfg = parseConfig("exclude:\n  labels: [dependencies]\n");
+    expect(excludedBy(mergedGh({ labels: [{ name: "Dependencies" }], user: human }).event.payload.pullRequest, cfg)).toBe("label dependencies");
+    expect(excludedBy(mergedGh({ labels: [{ name: "javascript" }], user: human }).event.payload.pullRequest, cfg)).toBeNull();
   });
 
   it("exclude.authors: [dependabot] matches the dependabot[bot] app", () => {
@@ -81,15 +87,17 @@ describe("GitHub history backfill authors", () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       const u = String(url);
       if (u.includes("/access_tokens")) return Response.json({ token: "ghs_x", expires_at: new Date(Date.now() + 3600_000).toISOString() });
-      if (u.includes("/pulls?state=closed")) return Response.json([
+      if (u.includes("/pulls?") && u.includes("state=closed")) return Response.json([
         { number: 1, title: "chore(deps): bump a from 1 to 2", merged_at: "2026-11-01T00:00:00Z", user: dependabot },
         { number: 2, title: "feat: x", merged_at: "2026-11-02T00:00:00Z", user: human },
+        { number: 3, title: "feat: y", merged_at: "2026-11-03T00:00:00Z", user: human, labels: [{ name: "no-changelog" }] },
       ]);
       return new Response("", { status: 404 });
     }));
     const { githubListMergedPullRequests } = await import("@/lib/github-api");
     const prs = await githubListMergedPullRequests("gh_1", "acme/demo", 10);
     const cfg = parseConfig("exclude:\n  authors: [bots]\n");
-    expect(prs.map((p) => excludedBy(p, cfg))).toEqual(["author dependabot", null]);
+    expect(prs.map((p) => excludedBy(p, cfg))).toEqual(["author dependabot", null, "label no-changelog"]);
+    expect(prs.map((p) => excludedBy(p, parseConfig('exclude:\n  authors: ["octo*"]\n')))).toEqual([null, "author octocat", "label no-changelog"]);
   });
 });
