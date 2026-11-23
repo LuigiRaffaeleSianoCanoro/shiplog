@@ -1,0 +1,368 @@
+[
+ {
+  "number": "2",
+  "title": "chore: repo hygiene (Apache-2.0 LICENSE, ignore tsbuildinfo)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-14T23:24:28Z"
+ },
+ {
+  "number": "3",
+  "title": "chore: add Apache-2.0 license field, untrack tsbuildinfo",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T11:37:26Z"
+ },
+ {
+  "number": "4",
+  "title": "docs: add SECURITY.md, CONTRIBUTING.md and CI workflow",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T11:40:21Z"
+ },
+ {
+  "number": "5",
+  "title": "feat(config): add per-repo .shiplog.yml",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T11:42:56Z"
+ },
+ {
+  "number": "6",
+  "title": "feat(commands): add /shiplog skip, /shiplog entry and no-changelog label",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T11:44:56Z"
+ },
+ {
+  "number": "7",
+  "title": "feat(release): detect breaking changes and suggest a semver bump",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T11:46:40Z"
+ },
+ {
+  "number": "8",
+  "title": "feat(cost): add batch mode and agent run counts",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T11:48:51Z"
+ },
+ {
+  "number": "9",
+  "title": "feat(public): per-repo changelog pages with RSS and JSON (roadmap item 6)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T17:41:32Z"
+ },
+ {
+  "number": "10",
+  "title": "feat(notify): user webhook notifications (roadmap item 7)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T17:42:31Z"
+ },
+ {
+  "number": "11",
+  "title": "feat(notes): audience release notes and en/es translation (roadmap item 8)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T17:43:35Z"
+ },
+ {
+  "number": "12",
+  "title": "Roadmap item 9: Historial inicial (changelog backfill on install)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T17:44:46Z"
+ },
+ {
+  "number": "13",
+  "title": "Roadmap item 10: documented self-host (Vercel + Origin App)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T17:46:02Z"
+ },
+ {
+  "number": "14",
+  "title": "Roadmap item 13: monorepo support (one changelog per package)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T17:47:51Z"
+ },
+ {
+  "number": "15",
+  "title": "feat(cron): overlap-safe poll endpoint and frequent scheduling docs (roadmap #11)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T17:49:42Z"
+ },
+ {
+  "number": "16",
+  "title": "ci: activate GitHub Actions workflow and Dependabot",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T18:39:52Z"
+ },
+ {
+  "number": "17",
+  "title": "chore: CODEOWNERS, issue and PR templates, code of conduct",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T18:52:17Z"
+ },
+ {
+  "number": "18",
+  "title": "feat(api): read-only changelog API and MCP server (roadmap item 14)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T18:54:29Z"
+ },
+ {
+  "number": "19",
+  "title": "feat: GitHub Sponsors funding and optional changelog badge",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T19:45:49Z"
+ },
+ {
+  "number": "20",
+  "title": "docs: OSS hygiene (TRADEMARKS, ROADMAP, README links)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T20:43:22Z"
+ },
+ {
+  "number": "21",
+  "title": "docs: lock GitHub App direction (roadmap item 12)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T22:46:04Z"
+ },
+ {
+  "number": "22",
+  "title": "feat: GitHub App webhook + install path (item 12 first slice)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-15T23:44:42Z"
+ },
+ {
+  "number": "23",
+  "title": "GitHub App slice 2: REST client, VCS routing, dual-provider UX",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-16T01:45:47Z"
+ },
+ {
+  "number": "24",
+  "title": "test(e2e): Playwright pre-merge suite for feat/mvp",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-16T03:41:15Z"
+ },
+ {
+  "number": "1",
+  "title": "Shiplog MVP (FAB-81–87)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-16T03:43:39Z"
+ },
+ {
+  "number": "25",
+  "title": "chore(deps): bump actions/setup-node from 4 to 7",
+  "login": "dependabot[bot]",
+  "type": "Bot",
+  "labels": [
+   "dependencies",
+   "github_actions"
+  ],
+  "mergedAt": "2026-10-17T16:20:26Z"
+ },
+ {
+  "number": "26",
+  "title": "chore(deps): bump actions/upload-artifact from 4 to 7",
+  "login": "dependabot[bot]",
+  "type": "Bot",
+  "labels": [
+   "dependencies",
+   "github_actions"
+  ],
+  "mergedAt": "2026-10-17T16:20:55Z"
+ },
+ {
+  "number": "31",
+  "title": "docs: community governance and support markdown",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-17T16:22:46Z"
+ },
+ {
+  "number": "27",
+  "title": "chore(deps): bump actions/checkout from 4 to 7",
+  "login": "dependabot[bot]",
+  "type": "Bot",
+  "labels": [
+   "dependencies",
+   "github_actions"
+  ],
+  "mergedAt": "2026-10-17T16:24:54Z"
+ },
+ {
+  "number": "41",
+  "title": "chore(deps): Next 16 and TypeScript 7 upgrade",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-10-17T16:25:07Z"
+ },
+ {
+  "number": "49",
+  "title": "fix: eliminate Blob list() on public reads and cache changelog surfaces",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-11-01T17:36:41Z"
+ },
+ {
+  "number": "50",
+  "title": "feat: add PostHog observability for Shiplog",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-11-01T17:53:51Z"
+ },
+ {
+  "number": "51",
+  "title": "fix: isolate middleware from PostHog/axios edge bundle",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-11-01T18:27:20Z"
+ },
+ {
+  "number": "52",
+  "title": "fix: stop posthog-node from entering middleware edge bundle via instrumentation",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-11-01T18:36:52Z"
+ },
+ {
+  "number": "66",
+  "title": "docs: content creation skills pack (Antigravity/Gemini/Cursor/Claude)",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-11-10T18:18:07Z"
+ },
+ {
+  "number": "70",
+  "title": "perf: reduce Fluid CPU — ISR public changelogs + narrower middleware",
+  "login": "LuigiRaffaeleSianoCanoro",
+  "type": "User",
+  "labels": [],
+  "mergedAt": "2026-11-18T20:41:04Z"
+ },
+ {
+  "number": "69",
+  "title": "chore(deps): bump next from 16.4.2 to 16.4.5",
+  "login": "dependabot[bot]",
+  "type": "Bot",
+  "labels": [
+   "dependencies",
+   "javascript"
+  ],
+  "mergedAt": "2026-11-18T20:41:30Z"
+ },
+ {
+  "number": "68",
+  "title": "chore(deps): bump hono from 4.13.13 to 4.13.18",
+  "login": "dependabot[bot]",
+  "type": "Bot",
+  "labels": [
+   "dependencies",
+   "javascript"
+  ],
+  "mergedAt": "2026-11-23T20:10:31Z"
+ },
+ {
+  "number": "67",
+  "title": "chore(deps): bump @hono/node-server from 2.1.5 to 2.1.8",
+  "login": "dependabot[bot]",
+  "type": "Bot",
+  "labels": [
+   "dependencies",
+   "javascript"
+  ],
+  "mergedAt": "2026-11-23T20:11:39Z"
+ },
+ {
+  "number": "54",
+  "title": "chore(deps-dev): bump @types/node from 26.6.5 to 26.6.6",
+  "login": "dependabot[bot]",
+  "type": "Bot",
+  "labels": [
+   "dependencies",
+   "javascript"
+  ],
+  "mergedAt": "2026-11-23T20:12:24Z"
+ },
+ {
+  "number": "46",
+  "title": "chore(deps): bump undici from 6.29.0 to 6.29.1",
+  "login": "dependabot[bot]",
+  "type": "Bot",
+  "labels": [
+   "dependencies",
+   "javascript"
+  ],
+  "mergedAt": "2026-11-23T20:13:04Z"
+ },
+ {
+  "number": "47",
+  "title": "chore(deps): bump fast-uri from 3.1.8 to 3.1.9",
+  "login": "dependabot[bot]",
+  "type": "Bot",
+  "labels": [
+   "dependencies",
+   "javascript"
+  ],
+  "mergedAt": "2026-11-23T20:14:08Z"
+ },
+ {
+  "number": "48",
+  "title": "chore(deps): bump body-parser from 2.3.0 to 2.4.0",
+  "login": "dependabot[bot]",
+  "type": "Bot",
+  "labels": [
+   "dependencies",
+   "javascript"
+  ],
+  "mergedAt": "2026-11-23T20:14:52Z"
+ }
+]
