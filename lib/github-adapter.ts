@@ -1,4 +1,5 @@
 import type { Envelope } from "./jobs";
+import { prAuthor, type GhUser } from "./github-author";
 
 const instId = (body: { installation?: { id?: number | string } }) =>
   body.installation?.id != null ? String(body.installation.id) : "";
@@ -9,13 +10,19 @@ function ghRepo(repo: { name?: string; owner?: { login?: string } }) {
   return { name, owner: { slug }, fullName: slug && name ? `${slug}/${name}` : undefined };
 }
 
-function ghPr(repo: ReturnType<typeof ghRepo>, pr: { number?: number; title?: string; body?: string | null; html_url?: string }) {
+function ghPr(
+  repo: ReturnType<typeof ghRepo>,
+  pr: { number?: number; title?: string; body?: string | null; html_url?: string; labels?: { name?: string }[]; user?: GhUser },
+) {
+  const author = prAuthor(pr.user);
   return {
     number: String(pr.number ?? ""),
     title: pr.title ?? "",
     body: pr.body ?? "",
     webUrl: pr.html_url ?? "",
     repository: repo,
+    labels: (pr.labels ?? []).map((l) => l?.name).filter((n): n is string => typeof n === "string" && n.length > 0),
+    ...(author ? { author } : {}),
   };
 }
 
