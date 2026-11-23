@@ -3,7 +3,7 @@ import { generateKeyPairSync, randomBytes } from "node:crypto";
 import prs from "./fixtures/shiplog-prs-2026-11.json";
 import { parseConfig, excludedBy } from "@/lib/config";
 import { batchPrompt, type QueuedEntry } from "@/lib/changelog";
-import { botUpdateText, groupBotEntries, leftOutBlock } from "@/lib/release-preview";
+import { botUpdateText, groupBotEntries, isBotAuthor, leftOutBlock } from "@/lib/release-preview";
 import { prAuthor } from "@/lib/github-author";
 
 // Real merged PRs of this repo, 2026-10-14 to 2026-11-23 (competitor review prototype, docs/propuesta-2).
@@ -39,8 +39,27 @@ describe(".shiplog.yml group_bots and skip_types", () => {
     const bot = prAuthor({ login: "dependabot[bot]", type: "Bot" });
     const pr = { title: "chore(deps): bump next from 1 to 2", author: bot };
     expect(excludedBy(pr, parseConfig("skip_types: [chore]\n"))).toBe("type chore");
-    expect(excludedBy(pr, parseConfig("group_bots: true\nskip_types: [chore]\n"))).toBeNull();
+    expect(excludedBy(pr, parseConfig("batch: release\ngroup_bots: true\nskip_types: [chore]\n"))).toBeNull();
     expect(excludedBy(pr, parseConfig("group_bots: true\nexclude:\n  authors: [bots]\n"))).toBe("author dependabot");
+  });
+
+  it("without batch mode, group_bots does not rescue bot PRs from skip_types (nothing to group them into)", () => {
+    const pr = { title: "chore(deps): bump next from 1 to 2", author: prAuthor({ login: "dependabot[bot]", type: "Bot" }) };
+    expect(excludedBy(pr, parseConfig("group_bots: true\nskip_types: [chore]\n"))).toBe("type chore");
+  });
+
+  it("human PRs are still skipped by type when group_bots is on", () => {
+    expect(excludedBy({ title: "chore: tidy", author: prAuthor({ login: "octocat", type: "User" }) }, parseConfig("batch: release\ngroup_bots: true\nskip_types: [chore]\n"))).toBe("type chore");
+  });
+
+  it("on the real history, skip_types [chore, ci, test, build] plus group_bots leaves 26 own entries, 10 grouped, 6 skipped", () => {
+    const cfg = parseConfig("batch: release\ngroup_bots: true\nskip_types: [chore, ci, test, build]\n");
+    const withAuthor = prs.map((p) => ({ ...p, author: prAuthor({ login: p.login, type: p.type }) }));
+    const skipped = withAuthor.filter((p) => excludedBy(p, cfg)).map((p) => p.number);
+    expect(skipped).toEqual(["2", "3", "16", "17", "24", "41"]);
+    const kept = withAuthor.filter((p) => !excludedBy(p, cfg)).map((p): QueuedEntry => ({ number: p.number, url: "", title: p.title, body: "", section: null, breaking: false, ...(isBotAuthor(p.author) ? { bot: true } : {}) }));
+    const { rest, grouped } = groupBotEntries(kept);
+    expect([rest.length, grouped.length]).toEqual([26, 10]);
   });
 
   it("labels still win over skip_types in the reason", () => {
@@ -64,6 +83,21 @@ describe("grouping bot PRs", () => {
     expect(bullet).toMatch(/^Dependency updates: /);
     expect(bullet).toContain("next 16.4.5");
     for (const g of grouped) expect(bullet).toContain(`#${g.number}`);
+  });
+
+  it("isBotAuthor recognizes apps, service accounts and apps acting through a user; not humans", () => {
+    expect(isBotAuthor({ app: { slug: "renovate" } })).toBe(true);
+    expect(isBotAuthor({ serviceAccount: { displayName: "ci" } })).toBe(true);
+    expect(isBotAuthor({ user: { username: "x", performedVia: { app: { slug: "y" } } } })).toBe(true);
+    expect(isBotAuthor({ user: { username: "octocat" } })).toBe(false);
+    expect(isBotAuthor(undefined)).toBe(false);
+  });
+
+  it("a bot PR with an explicit /shiplog entry keeps its own bullet", () => {
+    const bot = entries.find((e) => e.bot)!;
+    const { rest, grouped } = groupBotEntries([{ ...bot, entry: "Upgraded Next.js for faster builds" }]);
+    expect(grouped).toHaveLength(0);
+    expect(rest[0].entry).toBe("Upgraded Next.js for faster builds");
   });
 
   it("no bot entries means no bullet", () => {
@@ -104,6 +138,10 @@ describe("left out, and why", () => {
     expect(md).toContain("#13: label no-changelog");
   });
 
+  it("uses the singular for one bot PR", () => {
+    expect(leftOutBlock({ grouped: entries.filter((e) => e.bot).slice(0, 1), skipped: [] })).toContain("1 bot PR grouped into one bullet");
+  });
+
   it("is empty when nothing was left out", () => {
     expect(leftOutBlock({ grouped: [], skipped: [] })).toBe("");
   });
@@ -114,7 +152,7 @@ const master = randomBytes(32).toString("base64");
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("batch release with group_bots and skip_types", () => {
-  it("queues bots, skips internal types, groups at release and explains in the release comment", async () => {
+  async function originBatch(yml: string) {
     vi.resetModules();
     const pem = generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }).toString();
     for (const k of ["SHIPLOG_LLM_PROVIDER", "SHIPLOG_BYOK_ENABLED", "SUPABASE_URL", "GITHUB_APP_ID"]) vi.stubEnv(k, "");
@@ -124,7 +162,6 @@ describe("batch release with group_bots and skip_types", () => {
     const { seal, parseMasterKey } = await import("@/lib/crypto");
     await store.upsertInstallation({ id: "i_1", namespace: "luigi", status: "active", createdAt: "", installerId: "u" });
     await store.putKey({ ...seal("key_abcdefghijklmnop", parseMasterKey(master), "i_1"), installationId: "i_1", last4: "mnop", createdAt: "" });
-    const yml = "batch: release\ngroup_bots: true\nskip_types: [chore, ci]\n";
     const comments: string[] = [];
     const f = vi.fn(async (url: string, init?: any) => {
       const u = String(url);
@@ -137,7 +174,16 @@ describe("batch release with group_bots and skip_types", () => {
     });
     vi.stubGlobal("fetch", f);
     const jobs = await import("@/lib/jobs");
+    return { store, jobs, f, comments };
+  }
+
+  it("queues bots, skips internal types, groups at release and explains in the release comment", async () => {
+    const { store, jobs, f, comments } = await originBatch("batch: release\ngroup_bots: true\nskip_types: [chore, ci]\n");
     const repository = { name: "demo", owner: { slug: "luigi" } };
+    const old = { deliveryId: "old", installationId: "i_1", repo: "luigi/demo", prUrl: "", mode: "cursor" as const };
+    await store.putJob({ ...old, id: "o1", prNumber: "90", kind: "changelog", status: "ignored", result: "excluded by type chore", createdAt: "2026-01-01T00:00:00Z" });
+    await store.putJob({ ...old, id: "o2", prNumber: "91", kind: "release", status: "running", result: "agent x", createdAt: "2026-02-01T00:00:00Z" });
+    await store.putJob({ ...old, id: "o3", prNumber: "92", kind: "changelog", status: "ignored", result: "excluded by label no-changelog", createdAt: "2026-03-01T00:00:00Z" });
     const merge = (n: string, title: string, author?: unknown) => ({ installationId: "i_1", event: { type: "pull_request.merged", payload: { pullRequest: { number: n, title, body: "", webUrl: `https://cursor.com/codebase/luigi/demo/pull/${n}`, ...(author ? { author } : {}) }, repository } } });
     const bot = prAuthor({ login: "dependabot[bot]", type: "Bot" });
     expect((await jobs.handleEvent(merge("1", "feat: dark mode"), "e1"))?.status).toBe("queued");
@@ -157,6 +203,24 @@ describe("batch release with group_bots and skip_types", () => {
     expect(relComment).toContain("Left out of the changelog, and why");
     expect(relComment).toContain("2 bot PRs grouped into one bullet: #2, #3");
     expect(relComment).toContain("#4: type ci");
+    expect(relComment).toContain("#92: label no-changelog"); // after the previous release
+    expect(relComment).not.toContain("#90"); // before it, already reported then
+  });
+
+  it("the daily cron flush groups bot PRs too", async () => {
+    const { jobs, f } = await originBatch("batch: daily\ngroup_bots: true\n");
+    const repository = { name: "demo", owner: { slug: "luigi" } };
+    const bot = prAuthor({ login: "renovate[bot]", type: "Bot" });
+    for (const [n, t] of [["5", "chore(deps): bump vite from 7.0.0 to 7.1.0"], ["6", "chore(deps): bump zod from 4.6.5 to 4.6.6"]]) {
+      await jobs.handleEvent({ installationId: "i_1", event: { type: "pull_request.merged", payload: { pullRequest: { number: n, title: t, body: "", webUrl: `https://cursor.com/codebase/luigi/demo/pull/${n}`, author: bot }, repository } } }, `d${n}`);
+    }
+    await jobs.handleEvent({ installationId: "i_1", event: { type: "pull_request.merged", payload: { pullRequest: { number: "7", title: "fix: crash", body: "", webUrl: "https://cursor.com/codebase/luigi/demo/pull/7" }, repository } } }, "d7");
+    expect(await jobs.flushBatches()).toBe(1);
+    const prompt = JSON.parse(f.mock.calls.filter((c: any) => String(c[0]).endsWith("/v1/agents"))[0][1].body).prompt.text as string;
+    const group = /<group_entry>(.*)<\/group_entry>/.exec(prompt)?.[1] ?? "";
+    expect(group).toContain("vite 7.1.0 (#5)"); expect(group).toContain("zod 4.6.6 (#6)");
+    expect(prompt).not.toContain(`<pr number="5"`);
+    expect(prompt).toContain(`<pr number="7"`);
   });
 });
 

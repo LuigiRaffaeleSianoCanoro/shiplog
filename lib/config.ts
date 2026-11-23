@@ -1,4 +1,5 @@
 import { parse } from "yaml";
+import { isBotAuthor } from "./release-preview";
 import { classify, SECTIONS, type Section } from "./changelog";
 import type { OrphanMode, PackageDef } from "./packages";
 import { parseNoteAudiences, parseNoteLanguages, type NoteAudience, type NoteLanguage } from "./notes";
@@ -133,13 +134,13 @@ export function excludedBy(pr: any, c: ShiplogConfig): string | null {
   const label = labelNames(pr).find((l) => wanted.includes(l.toLowerCase()));
   if (label) return `label ${label.toLowerCase()}`;
   const a = pr?.author ?? {};
-  const isBot = Boolean(a.app || a.serviceAccount || a.user?.performedVia?.app);
+  const isBot = isBotAuthor(a);
   const name: string = a.user?.handle ?? a.user?.slug ?? a.user?.username ?? a.app?.slug ?? a.app?.displayName ?? a.serviceAccount?.displayName ?? a.login ?? "";
   if (name || isBot) {
     if (c.exclude.authors.some((p) => (p.toLowerCase() === "bots" && isBot) || (name && glob(p, name)))) return `author ${name || "bot"}`;
   }
   const type = /^(\w+)(\([^)]*\))?!?:/.exec(String(pr?.title ?? "").trim())?.[1]?.toLowerCase();
-  // With group_bots, bot PRs are grouped into one bullet instead of skipped by type (Dependabot titles are chore(deps)).
-  if (type && c.skipTypes.includes(type) && !(c.groupBots && isBot)) return `type ${type}`;
+  // With group_bots in batch mode, bot PRs are grouped into one bullet instead of skipped by type (Dependabot titles are chore(deps)).
+  if (type && c.skipTypes.includes(type) && !(c.groupBots && c.batch !== "off" && isBot)) return `type ${type}`;
   return null;
 }

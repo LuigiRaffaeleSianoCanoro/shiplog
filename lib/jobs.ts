@@ -15,7 +15,7 @@ import {
   repoPermission,
   vcsConfigured,
 } from "./vcs";
-import { isBotAuthor, leftOutBlock } from "./release-preview";
+import { groupBotEntries, isBotAuthor, leftOutBlock } from "./release-preview";
 import { DEFAULT_CONFIG, excludedBy, notesEnabled, sectionFor, type ShiplogConfig } from "./config";
 import { loadRepoConfig } from "./repo-config";
 import { allChangelogPaths, changelogTargets } from "./packages";
@@ -360,8 +360,9 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
         const l = await launchAgent(key!, prompt, repoUrl(repo));
         job.agentId = l.agentId; job.runId = l.runId; job.changelogPaths = releasePaths;
         job.result = `agent ${l.agentId}${queued.length ? ` (${queued.length} queued PRs)` : ""}`;
-        const leftOut = await leftOutSince(instId, repo, cfg, queued);
+        const queuedEntries = queued.map(entryOf); // read before markBatched overwrites job.result
         await markBatched(queued, job.id);
+        const leftOut = await leftOutSince(job, cfg, queuedEntries).catch((e) => { console.error("[shiplog] left-out summary failed:", (e as Error).message); return ""; });
         await postComment(instId, repo, prNumber, withNote(`**Shiplog** is cutting **${v}** with a Cursor cloud agent. A release PR will follow.${leftOut ? `\n\n${leftOut}` : ""}`));
       } else {
         job.result = releaseAgentPrompt(repo, v, cfg, releaseNoteExtras(cfg, v));
@@ -382,15 +383,15 @@ const entryOf = (j: Job): QueuedEntry => JSON.parse(j.result ?? "{}");
 const batchOf = (j: Job): string => { try { return JSON.parse(j.result ?? "{}").batch ?? ""; } catch { return ""; } };
 
 /** PRs that will not get their own bullet in this release: grouped bots and changelog jobs skipped since the previous release. */
-async function leftOutSince(installationId: string, repo: string, cfg: ShiplogConfig, queued: Job[]): Promise<string> {
-  const all = (await getStore().listJobs(installationId)).filter((j) => j.repo === repo);
-  const lastRelease = all.filter((j) => j.kind === "release" && j.status !== "ignored" && j.status !== "failed" && j.prNumber !== "")
-    .map((j) => j.createdAt).sort().slice(0, -1).pop(); // the newest one is the release being cut now
+async function leftOutSince(current: Job, cfg: ShiplogConfig, queued: QueuedEntry[]): Promise<string> {
+  const all = (await getStore().listJobs(current.installationId)).filter((j) => j.repo === current.repo && j.id !== current.id);
+  const lastRelease = all.filter((j) => j.kind === "release" && j.status !== "ignored" && j.status !== "failed" && j.createdAt <= current.createdAt)
+    .map((j) => j.createdAt).sort().pop();
   const skipped = all
     .filter((j) => j.kind === "changelog" && j.status === "ignored" && j.prNumber && (!lastRelease || j.createdAt > lastRelease))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .map((j) => ({ number: j.prNumber, reason: (j.result ?? "").replace(/^excluded by /, "") }));
-  const grouped = cfg.groupBots ? queued.map(entryOf).filter((e) => e.bot) : [];
+  const grouped = cfg.groupBots ? groupBotEntries(queued).grouped : [];
   return leftOutBlock({ grouped, skipped });
 }
 

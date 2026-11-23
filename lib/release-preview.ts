@@ -1,4 +1,4 @@
-import { stripPrefix, type QueuedEntry } from "./changelog";
+import type { QueuedEntry } from "./changelog";
 
 /** Same bot test as `exclude.authors: [bots]`: an app, a service account, or an app acting through a user. */
 export function isBotAuthor(author: unknown): boolean {
@@ -12,16 +12,16 @@ const BUMP = /^\w+(?:\([^)]*\))?!?:\s*bump (\S+) from \S+ to (\S+)/i;
 /** "chore(deps): bump next from 16.4.2 to 16.4.5" becomes "next 16.4.5"; other titles lose only their prefix. No angle brackets survive. */
 export function botUpdateText(title: string): string {
   const m = BUMP.exec(title.trim());
-  const text = m ? `${m[1]} ${m[2]}` : stripPrefix(title) || title.trim();
+  const text = m ? `${m[1]} ${m[2]}` : title.replace(/^\w+(\([^)]*\))?!?:\s*/, "").trim() || title.trim();
   return text.replace(/[<>]/g, "");
 }
 
-/** Bot PRs collapse into one "Dependency updates" bullet, in queue order. */
+/** Bot PRs collapse into one "Dependency updates" bullet, in queue order. A bot PR with an explicit `/shiplog entry` keeps its own bullet. */
 export function groupBotEntries(entries: QueuedEntry[]): { rest: QueuedEntry[]; grouped: QueuedEntry[]; bullet: string | null } {
-  const grouped = entries.filter((e) => e.bot);
+  const grouped = entries.filter((e) => e.bot && !e.entry);
   if (!grouped.length) return { rest: entries, grouped: [], bullet: null };
   const bullet = `Dependency updates: ${grouped.map((e) => `${botUpdateText(e.title)} (#${e.number})`).join(", ")}`;
-  return { rest: entries.filter((e) => !e.bot), grouped, bullet };
+  return { rest: entries.filter((e) => !grouped.includes(e)), grouped, bullet };
 }
 
 export interface SkippedPr { number: string; reason: string }
