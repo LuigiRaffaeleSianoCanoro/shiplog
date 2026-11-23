@@ -23,4 +23,5 @@ export function getStore(): Store {
   return store;
 }
 export function setStore(s: Store) { store = s; }
+export { StoreAuthError, isStoreAuthError } from "./store-auth-error";
 export type * from "./types";

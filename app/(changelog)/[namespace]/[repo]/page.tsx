@@ -3,8 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SECTIONS } from "@/lib/changelog";
 import { schedulePublicChangelogViewed } from "@/lib/analytics/track";
-import { buildPublicMeta, publicPageTitle, resolvePublicChangelog } from "@/lib/public-changelog";
+import { buildPublicMeta, loadPublicChangelog, publicPageTitle } from "@/lib/public-changelog";
 import { publicSiteOrigin } from "@/lib/request-origin";
+import { StoreUnavailableView } from "@/lib/store-unavailable-view";
 import { getStore } from "@/lib/store";
 
 export const revalidate = 300;
@@ -13,8 +14,10 @@ type Props = { params: Promise<{ namespace: string; repo: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { namespace, repo } = await params;
-  const data = await resolvePublicChangelog(namespace, repo, getStore());
-  if (!data) return { title: "Not found" };
+  const loaded = await loadPublicChangelog(namespace, repo, getStore());
+  if (loaded.status === "store_unavailable") return { title: "Unavailable" };
+  if (loaded.status === "not_found") return { title: "Not found" };
+  const data = loaded.data;
   const title = publicPageTitle(namespace, repo);
   const pageUrl = buildPublicMeta(publicSiteOrigin(), namespace, repo).pageUrl;
   return {
@@ -31,10 +34,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PublicChangelogPage({ params }: Props) {
   const { namespace, repo } = await params;
-  const data = await resolvePublicChangelog(namespace, repo, getStore());
-  if (!data) notFound();
+  const loaded = await loadPublicChangelog(namespace, repo, getStore());
+  if (loaded.status === "store_unavailable") return <StoreUnavailableView />;
+  if (loaded.status === "not_found") notFound();
+  const data = loaded.data;
   schedulePublicChangelogViewed(data.repoSlug);
-  const pageUrl = buildPublicMeta(publicSiteOrigin(), namespace, repo).pageUrl;
+  const origin = publicSiteOrigin();
+  const pageUrl = buildPublicMeta(origin, namespace, repo).pageUrl;
   const releases = data.document.releases.filter(
     (r) => r.version !== "Unreleased" || SECTIONS.some((s) => r.sections[s].length),
   );

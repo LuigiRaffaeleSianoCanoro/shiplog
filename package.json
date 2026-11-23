@@ -9,7 +9,8 @@
     "start": "next start",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "blob:diagnose": "npx --yes tsx scripts/blob-diagnose.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
