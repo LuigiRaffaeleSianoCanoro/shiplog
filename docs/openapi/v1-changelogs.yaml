@@ -1,0 +1,202 @@
+openapi: 3.1.0
+info:
+  title: Shiplog read API
+  version: "1"
+  summary: Read-only access to public changelogs written by Shiplog for Cursor Origin.
+  description: |
+    Public, unauthenticated, read-only. Data is the same as the public changelog page.
+    Successful responses are cached at the edge for 5 minutes (`public, s-maxage=300, stale-while-revalidate=600`).
+    `test/openapi-drift.test.ts` checks this file against the real route handlers.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+# Public read API: no authentication.
+security: []
+servers:
+  - url: https://shiplog.help
+paths:
+  /api/v1/changelogs/{namespace}/{repo}:
+    get:
+      operationId: getChangelog
+      summary: Full structured changelog for a repo or one monorepo package.
+      parameters:
+        - $ref: "#/components/parameters/namespace"
+        - $ref: "#/components/parameters/repo"
+        - name: changelog
+          in: query
+          required: false
+          description: Path of a package changelog, for example `packages/web/CHANGELOG.md`. Omit for the root `CHANGELOG.md`.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Changelog.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Changelog" }
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/StoreUnavailable"
+  /api/v1/changelogs/{namespace}/{repo}/packages:
+    get:
+      operationId: listPackages
+      summary: Which changelogs exist for a repo (root and monorepo packages).
+      parameters:
+        - $ref: "#/components/parameters/namespace"
+        - $ref: "#/components/parameters/repo"
+      responses:
+        "200":
+          description: Package listing.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PackageListing" }
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/StoreUnavailable"
+  /api/v1/changelogs/{namespace}/{repo}/releases/{version}:
+    get:
+      operationId: getRelease
+      summary: One release by version. A leading `v` is optional.
+      parameters:
+        - $ref: "#/components/parameters/namespace"
+        - $ref: "#/components/parameters/repo"
+        - name: version
+          in: path
+          required: true
+          schema: { type: string }
+          example: v1.2.0
+        - name: changelog
+          in: query
+          required: false
+          description: Package changelog path, as in getChangelog.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Release.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Release" }
+        "404":
+          description: Repo or release not found.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/NotFoundError"
+                  - $ref: "#/components/schemas/ReleaseNotFoundError"
+        "503":
+          $ref: "#/components/responses/StoreUnavailable"
+components:
+  parameters:
+    namespace:
+      name: namespace
+      in: path
+      required: true
+      description: Cursor Origin or GitHub owner slug.
+      schema: { type: string }
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema: { type: string }
+  responses:
+    NotFound:
+      description: No active installation or repo for this namespace.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/NotFoundError" }
+    StoreUnavailable:
+      description: "Changelog storage can't be read right now. Not cached (`cache-control: no-store`). Retry later."
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/StoreUnavailableError" }
+  schemas:
+    Sections:
+      type: object
+      description: Only non-empty sections are present.
+      properties:
+        Added: { type: array, items: { type: string } }
+        Changed: { type: array, items: { type: string } }
+        Deprecated: { type: array, items: { type: string } }
+        Removed: { type: array, items: { type: string } }
+        Fixed: { type: array, items: { type: string } }
+        Security: { type: array, items: { type: string } }
+    FeedRelease:
+      type: object
+      required: [version, date, summary, sections]
+      properties:
+        version: { type: string, description: "Semver without `v`, or `Unreleased`." }
+        date: { type: [string, "null"], format: date }
+        summary: { type: [string, "null"] }
+        sections: { $ref: "#/components/schemas/Sections" }
+    Changelog:
+      type: object
+      required: [apiVersion, changelogPath, links, title, repo, updatedAt, page, feeds, releases]
+      properties:
+        apiVersion: { type: string, const: "v1" }
+        changelogPath: { type: string, example: CHANGELOG.md }
+        links:
+          type: object
+          required: [self, packages, mcp]
+          properties:
+            self: { type: string, format: uri }
+            packages: { type: string, format: uri }
+            mcp: { type: string, format: uri }
+        title: { type: string }
+        repo: { type: string, example: acme/demo }
+        updatedAt: { type: string, format: date-time }
+        page: { type: string, format: uri }
+        feeds:
+          type: object
+          required: [rss, json]
+          properties:
+            rss: { type: string, format: uri }
+            json: { type: string, format: uri }
+        releases:
+          type: array
+          description: Newest first.
+          items: { $ref: "#/components/schemas/FeedRelease" }
+    PackageListing:
+      type: object
+      required: [apiVersion, repo, root, packages]
+      properties:
+        apiVersion: { type: string, const: "v1" }
+        repo: { type: string }
+        root: { type: boolean, description: "Whether the root CHANGELOG.md exists." }
+        packages:
+          type: array
+          items:
+            type: object
+            required: [changelogPath]
+            properties:
+              changelogPath: { type: string }
+    Release:
+      type: object
+      required: [apiVersion, repo, changelogPath, version, date, summary, sections]
+      properties:
+        apiVersion: { type: string, const: "v1" }
+        repo: { type: string }
+        changelogPath: { type: string }
+        version: { type: string }
+        date: { type: [string, "null"], format: date }
+        summary: { type: [string, "null"] }
+        sections: { $ref: "#/components/schemas/Sections" }
+    NotFoundError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, const: not_found }
+      additionalProperties: false
+    ReleaseNotFoundError:
+      type: object
+      required: [error, version]
+      properties:
+        error: { type: string, const: release_not_found }
+        version: { type: string }
+      additionalProperties: false
+    StoreUnavailableError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, const: store_unavailable }
