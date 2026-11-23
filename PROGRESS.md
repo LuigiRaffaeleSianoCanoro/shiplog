@@ -1,6 +1,6 @@
 # Progress and decision log
 
-Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against `feat/mvp`.
+Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against `main` (the MVP line was `feat/mvp`, merged in #1). Current priorities: [ROADMAP.md](ROADMAP.md) and [docs/BACKLOG.md](docs/BACKLOG.md).
 
 ## Decisions
 
@@ -92,7 +92,7 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - Item 2. Neon test mode keeps its own stored changelog and ignores `changelog:` (path matters only for agent and prompt modes).
 - Item 3. Without Origin credentials (local runs) commands are not read at merge time. Only labels apply there.
 - Item 5. Pre-1.0 versions get plain semver bumps (0.x to 1.0.0 on breaking). No special 0.x rule.
-- Item 4. Queued PRs wait forever if `batch: release` is set and no release is ever cut, or if the key is removed. A dashboard flush button or expiry would close this.
+- Item 4. Queued PRs wait forever if `batch: release` is set and no release is ever cut, or if the key is removed. A dashboard flush button or expiry would close this (backlog 9 and 10).
 - Item 4. Run cost in money is not shown, only the run count.
 
 - 2026-10-15. Item 13. No Neon AI Gateway credentials on the build box, so implement, test and review were done directly by the agent.
@@ -103,7 +103,12 @@ Roadmap source: shiplog-estrategia.md, section 3. One small PR per item against 
 - Item 6. Public page does not yet pull `CHANGELOG.md` from Origin for cursor or prompt mode installs. Luigi or a follow-up can add optional `.shiplog.yml` `public: true` plus Origin file fetch.
 - Item 8. Per-PR audience snippets (before release) and languages beyond en/es are not implemented.
 - Item 1. Record the 5 to 10 minute demo video and pass Origin marketplace review (needs Luigi).
-- Item 7. Email notifications are out of scope (webhook-only per roadmap). Retry/backoff for failed webhooks is not implemented.
-- Item 14. MCP has no OAuth or per-repo URL tokens (public read only). Optional API rate limiting and OpenAPI export are not implemented.
+- Item 7. Email notifications are out of scope (webhook-only per roadmap). Retries with backoff shipped in #64.
+- Item 14. MCP has no OAuth or per-repo URL tokens (public read only, backlog 19). Rate limiting is backlog 13. The OpenAPI description shipped in #75.
 
 - 2026-10-16. Community governance docs on `main`. Single-maintainer model documented in GOVERNANCE.md with GitHub Discussions and a 7-day comment window before maintainer decisions, to align with future Open Source Collective expectations. CONTRIBUTOR_LADDER.md follows CNCF-style stages (Participant through Maintainer) plus a 6-month emeritus rule; BACKERS.md mirrors GitHub Sponsors tier names (Mate, Faro, Lobo Marino, Puerto, Rambla, Cortado, Docena de medialunas) without listing sponsors until they opt in. CONTRIBUTING.md now targets pull requests to `main` and includes a "Your first PR in 15 minutes" path.
+
+- 2026-11-23. Roadmap run on `main`. Neon AI Gateway roles: orchestrator gpt-6-astra, implementer claude-opus-5-5, reviewers claude-fable-5-1 and grok-4-6. Each PR had red-then-green tests, a Neon review, a real-app check where it touched runtime code, and green CI before merge. Merged: #57, #58, #59, #62, #64, #65 (reliability and tests), #71 (zod advisory override), #72 and #73 (item 15 widget, visual OK from Luigi), #74 (weekly namespace index backfill), #75 (OpenAPI), #76 (GitHub labels and author reach the exclude rules), #77 (bot grouping and skip reasons). No production deploy. The Vercel project has no Git auto-deploy, so merges do not ship.
+- 2026-11-23. Item 4. `group_bots` applies only in batch mode, because per-PR modes have nothing to fold the bot PRs into. In batch mode it also lets bot PRs through `skip_types`, since Dependabot titles are `chore(deps)`. An explicit `/shiplog entry` overrides `skip_types` but never labels or authors.
+- 2026-11-23. Item 12. GitHub `type: Bot` users map to Origin-style `app` authors with `[bot]` stripped, so `exclude.authors: [dependabot]` and `bots` match on both providers.
+- 2026-11-23. Item 15. The widget is plain ASCII JavaScript with a Shadow DOM and `textContent` only, so host pages without a charset and hostile release text cannot break it. User-facing copy names the project "Shiplog para Cursor Origin" and links to shiplog.help, because shiplog.today is an unrelated product with the same name.

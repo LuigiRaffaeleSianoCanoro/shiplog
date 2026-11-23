@@ -1,41 +1,48 @@
 # Roadmap
 
-Public priorities for Shiplog on the `feat/mvp` line. Source list: internal strategy doc section 3. Implementation notes and tradeoffs live in [PROGRESS.md](PROGRESS.md).
+Public priorities for Shiplog. Work lands on `main` in small PRs. The evidence-based engineering list, with one row per item and its status, is [docs/BACKLOG.md](docs/BACKLOG.md). Implementation notes and tradeoffs live in [PROGRESS.md](PROGRESS.md).
 
-Status key: **Done** shipped on `feat/mvp`. **Next** is the near-term focus after the MVP slice. **Later** needs product direction before build.
+Status key: **Done** is merged on `main`. **Next** is the near-term focus. **Later** needs product direction before build.
 
-## Done on `feat/mvp`
+## Done
 
-1. **Open source hygiene** — Apache-2.0, SECURITY.md, CONTRIBUTING.md, CI, Dependabot, issue and PR templates, CODE_OF_CONDUCT.md
-2. **Per-repo config** — `.shiplog.yml`
-3. **PR commands** — `/shiplog skip`, `/shiplog entry`, `/shiplog release`
-4. **Batch mode** — `batch: release` and `batch: daily`, with dashboard run visibility
-5. **Breaking changes** — detection and advisory semver bump suggestions
-6. **Public changelog pages** — Harbor styling, RSS and JSON feeds
-7. **Notify webhooks** — Slack, Discord, generic HTTPS POST
-8. **Audience release notes** — technical and customer, en and es via `notes` in config
-9. **History backfill** — seed `CHANGELOG.md` from merged PRs and semver tags
-10. **Self-host** — `docs/self-host.md` and Deploy to Vercel flow
-11. **Agent polling** — Vercel Cron, lock, documented external schedulers
-13. **Monorepo** — multiple changelogs via `packages` in `.shiplog.yml`
-14. **Read-only API and MCP** — `/api/v1/changelogs/…` and `/api/mcp`
-12. **GitHub App** — GitHub-native and mirrored repos: webhooks, install path, GitHub REST client, dual-provider setup and dashboard UX ([docs/adr/0012-github-app.md](docs/adr/0012-github-app.md))
+1. **Open source hygiene**: Apache-2.0, SECURITY.md, CONTRIBUTING.md, CI, Dependabot, issue and PR templates, CODE_OF_CONDUCT.md, governance docs
+2. **Per-repo config**: `.shiplog.yml`
+3. **PR commands**: `/shiplog skip`, `/shiplog entry`, `/shiplog release`
+4. **Batch mode**: `batch: release` and `batch: daily`, with dashboard run visibility. Bot PRs can be grouped into one bullet and internal types skipped with a reason (`group_bots`, `skip_types`, #77)
+5. **Breaking changes**: detection and advisory semver bump suggestions
+6. **Public changelog pages**: Harbor styling, RSS and JSON feeds
+7. **Notify webhooks**: Slack, Discord, generic HTTPS POST, with bounded retries (#64)
+8. **Audience release notes**: technical and customer, en and es via `notes` in config
+9. **History backfill**: seed `CHANGELOG.md` from merged PRs and semver tags
+10. **Self-host**: [docs/self-host.md](docs/self-host.md) and the Deploy to Vercel flow
+11. **Agent polling**: Vercel Cron, lock, documented external schedulers, weekly namespace index backfill (#74)
+12. **GitHub App**: GitHub-native and mirrored repos, webhooks, install path, REST client, dual-provider setup and dashboard ([ADR 0012](docs/adr/0012-github-app.md)). Labels and authors on GitHub PRs feed the exclude rules (#76)
+13. **Monorepo**: multiple changelogs via `packages` in `.shiplog.yml`
+14. **Read-only API and MCP**: `/api/v1/changelogs/…` and `/api/mcp`, described in [OpenAPI 3.1](docs/openapi/v1-changelogs.yaml) with a drift test (#75)
+15. **In-app "What's new" widget**: `public/widget.js` reads a repo's `feed.json` and shows unread releases in a badge and panel (#72, #73)
 
-**Monetization readiness (section 5.4)**
+**Reliability on `main` (November 2026)**: a Blob store that refuses reads returns `503 store_unavailable` instead of 500 on the API, feeds and MCP (#57, #62). `/api/health` proves Blob is readable (#58). The MCP HTTP route has its own tests (#65).
+
+**Monetization readiness**
 
 - GitHub Sponsors via [`.github/FUNDING.yml`](.github/FUNDING.yml)
 - Default **Changelog by Shiplog** badge on public pages (`powered_by` in `.shiplog.yml`)
 
 ## Next
 
-- **Origin marketplace publish** — record the public demo video and complete Cursor Origin app review (see [README.md](README.md#publishing-not-done-yet)). Needs the maintainer; tracked in PROGRESS.md.
+- **Release preview in the dashboard**: show the batch draft next to "Left out of the changelog, and why" (the data shipped in #77). UI, so it needs a design pass first.
+- **Rate limits** for the read API and MCP (backlog 13).
+- **Stale batch queue recovery** (backlog 9).
+- **HTML 503** for public changelog pages when the store is down (backlog 7).
+- **Origin marketplace publish**: record the public demo video and complete Cursor Origin app review (see [README.md](README.md#publishing-not-done-yet)). Needs the maintainer.
 
 ## Later
 
-15. **In-app changelog widget** — embed or surface changelogs inside other products; not scoped yet
-
-16. **Paid hosted Shiplog plan** — hosted offering beyond self-host and BYOK; not scoped yet
+16. **Paid hosted Shiplog plan**: hosted offering beyond self-host and BYOK; not scoped yet
+- **MCP auth** with per-repo tokens or OAuth (backlog 19)
+- **GitHub Marketplace listing** for the GitHub App (backlog 18)
 
 ## How to contribute
 
-Pick an item, read the matching notes in [PROGRESS.md](PROGRESS.md), and open a small PR against `feat/mvp`. For brand use, see [TRADEMARKS.md](TRADEMARKS.md).
+Pick an item, read its row in [docs/BACKLOG.md](docs/BACKLOG.md) and the matching notes in [PROGRESS.md](PROGRESS.md), then open a small PR against `main`. Issues labeled `good first issue` (#33 to #40) are kept for new contributors. For brand use, see [TRADEMARKS.md](TRADEMARKS.md).
