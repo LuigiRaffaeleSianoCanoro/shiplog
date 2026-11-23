@@ -115,6 +115,16 @@ Breaking changes (`feat!:` titles or a `BREAKING CHANGE:` footer) are marked `**
 
 The `no-changelog` label always skips a PR, as does any label in `exclude.labels` (default `skip-changelog`).
 
+## Embed a "What's new" widget
+
+Add one script tag to your app to show the latest changelog entries in a floating panel:
+
+```html
+<script src="https://shiplog.help/widget.js" data-feed="https://shiplog.help/OWNER/REPO/feed.json" data-lang="en" defer></script>
+```
+
+`data-lang` is `en` or `es` (defaults to the browser language). `data-limit` sets how many entries to show (default 8). The widget reads the public JSON feed, keeps the last seen version in `localStorage` for the unread badge, and renders inside a Shadow DOM so it doesn't touch your styles. It is under 5 KB gzipped and has no dependencies.
+
 ## Contributing
 
 Pull requests and pushes to `main` run CI (`.github/workflows/ci.yml`): `npm ci`, `npx tsc --noEmit`, `npm test`, `npm run build`, and a gitleaks secret scan. See [CONTRIBUTING.md](CONTRIBUTING.md).
