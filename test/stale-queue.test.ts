@@ -67,6 +67,41 @@ describe("stale batch queue recovery", () => {
     expect(comments.length).toBe(n);
   });
 
+  it("a PR merged after the reminder does not trigger another one until a full stale period has passed", async () => {
+    const { jobs, comments } = await setup("batch: release\n");
+    await queueTwo(jobs);
+    const t0 = Date.now();
+    await jobs.recoverStaleQueue(new Date(t0 + 15 * DAY));
+    await jobs.handleEvent(merge("42", "feat: export"), "q3");
+    const n = comments.length;
+    expect(await jobs.recoverStaleQueue(new Date(t0 + 16 * DAY))).toEqual({ recovered: 0, reminded: 0 });
+    expect(comments.length).toBe(n);
+    expect(await jobs.recoverStaleQueue(new Date(t0 + 30 * DAY))).toEqual({ recovered: 0, reminded: 3 });
+    expect(comments.at(-1)!.body).toContain("3 merged PRs (#40, #41, #42)");
+  });
+
+  it("defaults to 14 days", async () => {
+    const { jobs } = await setup("batch: release\n");
+    await queueTwo(jobs);
+    expect((await jobs.recoverStaleQueue(new Date(Date.now() + 13 * DAY))).reminded).toBe(0);
+    expect((await jobs.recoverStaleQueue(new Date(Date.now() + 14 * DAY + 60_000))).reminded).toBe(2);
+  });
+
+  it("only the repo with a stale PR is touched, and its fresh PRs ride along", async () => {
+    const { store, jobs, comments } = await setup("batch: release\n");
+    await queueTwo(jobs);
+    const other = (n: string) => ({ installationId: "i_1", event: { type: "pull_request.merged", payload: { pullRequest: { number: n, title: "feat: z", body: "", webUrl: `https://cursor.com/codebase/luigi/other/pull/${n}` }, repository: { name: "other", owner: { slug: "luigi" } } } } });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(Date.now() + 10 * DAY));
+    await jobs.handleEvent(merge("43", "fix: late"), "q4");
+    await jobs.handleEvent(other("7"), "o1");
+    await store.deleteKey("i_1");
+    expect(await jobs.recoverStaleQueue(new Date(Date.now() + 5 * DAY))).toEqual({ recovered: 3, reminded: 0 });
+    expect(comments.at(-1)!.pr).toBe("43");
+    const left = (await store.listJobs()).filter((j: any) => j.status === "queued");
+    expect(left.map((j: any) => `${j.repo}#${j.prNumber}`)).toEqual(["luigi/other#7"]);
+  });
+
   it("a later release still batches reminded PRs", async () => {
     const { store, jobs, launches } = await setup("batch: release\n");
     await queueTwo(jobs);

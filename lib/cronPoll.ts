@@ -22,7 +22,8 @@ export async function runCronPoll(): Promise<CronPollResult> {
   }
   try {
     const batches = await flushBatches();
-    const stale = await recoverStaleQueue();
+    // Recovery must never block agent polling.
+    const stale = await recoverStaleQueue().catch((e) => { console.error("[shiplog] stale queue recovery failed:", (e as Error).message); return { recovered: 0, reminded: 0 }; });
     const updated = await pollAgents();
     return { updated, batches, stale };
   } finally {

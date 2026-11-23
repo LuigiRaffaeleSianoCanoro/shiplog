@@ -458,7 +458,8 @@ export async function recoverStaleQueue(now: Date = new Date()): Promise<{ recov
   const cutoff = now.getTime() - days * 24 * 3600 * 1000;
   const store = getStore();
   const byRepo = new Map<string, Job[]>();
-  for (const j of (await store.listJobs()).filter((j) => j.status === "queued").reverse()) {
+  const all = (await store.listJobs()).filter((j) => j.status === "queued").sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  for (const j of all) {
     const k = `${j.installationId}\t${j.repo}`;
     byRepo.set(k, [...(byRepo.get(k) ?? []), j]);
   }
@@ -477,15 +478,16 @@ export async function recoverStaleQueue(now: Date = new Date()): Promise<{ recov
         out.recovered += queued.length;
         continue;
       }
-      const fresh = queued.filter((j) => !entryOf(j).staleNotifiedAt);
-      if (!fresh.length) continue;
+      // One reminder per repo per stale period, however many PRs merge in between.
+      const last = Math.max(0, ...queued.map((j) => Date.parse(entryOf(j).staleNotifiedAt ?? "") || 0));
+      if (last && last > cutoff) continue;
       const since = queued[0].createdAt.slice(0, 10);
       const body = queued.every((j) => batchOf(j) === "daily")
         ? `**Shiplog**: ${queued.length} merged PRs (${list}) have been waiting for the daily batch since ${since}, and the agent launch keeps failing. Check the Cursor key on the Shiplog setup page. Shiplog retries on every cron run.`
         : `**Shiplog**: ${queued.length} merged PRs (${list}) have been waiting for a release since ${since}. Comment \`/shiplog release vX.Y.Z\` on any PR to ship them in one agent run.`;
       await postComment(installationId, repo, newest.prNumber, body);
-      for (const j of fresh) { j.result = JSON.stringify({ ...JSON.parse(j.result ?? "{}"), staleNotifiedAt: now.toISOString() }); await store.putJob(j); }
-      out.reminded += fresh.length;
+      for (const j of queued) { j.result = JSON.stringify({ ...JSON.parse(j.result ?? "{}"), staleNotifiedAt: now.toISOString() }); await store.putJob(j); }
+      out.reminded += queued.length;
     } catch (e) { console.error("[shiplog] stale queue recovery failed:", (e as Error).message); }
   }
   return out;
