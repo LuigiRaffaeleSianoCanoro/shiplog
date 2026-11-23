@@ -94,6 +94,7 @@ Users can install with `https://<your-host>/api/github/install/start` (same `SHI
 - `CURSOR_API_BASE` — override Cursor API base (default `https://api.cursor.com`).
 - `ORIGIN_JWKS_URL` — override JWKS URL for webhook verification (default production Cursor JWKS). Local tests only.
 - `SHIPLOG_INSECURE_WEBHOOKS` — `true` skips webhook signatures when `NODE_ENV` is not `production`. **Never set on Vercel production.**
+- `SHIPLOG_QUEUE_STALE_DAYS`: how many days a PR queued by `batch: release` or `batch: daily` may wait before the cron poll recovers it (default 14, `0` turns it off). If the installation has no Cursor key any more, Shiplog posts every queued PR as one ready-to-run prompt on the newest PR and closes the queue, at $0. With a key, it never launches an agent on its own. It comments once on the newest PR, asking for `/shiplog release` (or, for `daily`, to check the key), and the PRs stay queued. The poll response reports `stale.recovered` and `stale.reminded`.
 - `SHIPLOG_ALLOW_HTTP_NOTIFY` — `true` allows `http://127.0.0.1` or `http://localhost` notify URLs (Playwright e2e and local dev only). Production still requires `https:`.
 - `NEXT_PUBLIC_POSTHOG_KEY` — PostHog project API key (public; safe in the browser). When unset, analytics is disabled.
 - `NEXT_PUBLIC_POSTHOG_HOST` — PostHog ingest host (default `https://us.i.posthog.com`). The app proxies browser traffic through `/ingest` on your domain.

@@ -59,7 +59,7 @@ describe("runCronPoll", () => {
     vi.spyOn(jobs, "flushBatches").mockResolvedValue(2);
     vi.spyOn(jobs, "pollAgents").mockResolvedValue(3);
     const r = await runCronPoll();
-    expect(r).toEqual({ updated: 3, batches: 2 });
+    expect(r).toEqual({ updated: 3, batches: 2, stale: { recovered: 0, reminded: 0 } });
   });
 });
 
@@ -84,7 +84,7 @@ describe("GET /api/cron/poll", () => {
       new Request("https://x/api/cron/poll", { headers: { authorization: "Bearer cron-test-secret" } }),
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ updated: 2, batches: 1 });
+    expect(await res.json()).toEqual({ updated: 2, batches: 1, stale: { recovered: 0, reminded: 0 } });
   });
 
   it("returns skipped when another poll holds the lock", async () => {

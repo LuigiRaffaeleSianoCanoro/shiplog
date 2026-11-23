@@ -170,8 +170,8 @@ function releaseAgentPrompt(repo: string, version: string, cfg: ShiplogConfig, e
   return extra ? `${p}\n${extra}\nYou may also create the audience note files listed above.` : p;
 }
 
-/** Queued PRs at release time: one batch section per changelog file. */
-function batchReleasePrompt(repo: string, queued: Job[], cfg: ShiplogConfig, version: string, extra?: string) {
+/** Queued PRs in one prompt, one batch section per changelog file. With a version, the same run cuts the release. */
+function batchReleasePrompt(repo: string, queued: Job[], cfg: ShiplogConfig, version?: string, extra?: string) {
   const byPath = new Map<string, QueuedEntry[]>();
   for (const j of queued) {
     const e = entryOf(j);
@@ -179,7 +179,7 @@ function batchReleasePrompt(repo: string, queued: Job[], cfg: ShiplogConfig, ver
     for (const path of paths) byPath.set(path, [...(byPath.get(path) ?? []), e]);
   }
   const date = today();
-  const parts = [...byPath.entries()].map(([path, entries]) => batchPrompt(repo, entries, styleOf(cfg, path), { version, date }, extra, path, { groupBots: cfg.groupBots }));
+  const parts = [...byPath.entries()].map(([path, entries]) => batchPrompt(repo, entries, styleOf(cfg, path), version ? { version, date } : undefined, extra, path, { groupBots: cfg.groupBots }));
   return parts.length === 1 ? parts[0] : parts.join("\n\n---\n\n");
 }
 
@@ -438,6 +438,57 @@ export async function flushBatches(): Promise<number> {
     } catch (e) { console.error("[shiplog] batch flush failed:", (e as Error).message); }
   }
   return launched;
+}
+
+/** Days a queued PR may wait before recovery. SHIPLOG_QUEUE_STALE_DAYS, default 14; 0 turns recovery off. */
+function staleDays(): number {
+  const raw = process.env.SHIPLOG_QUEUE_STALE_DAYS?.trim();
+  return raw && /^\d+$/.test(raw) ? Number(raw) : 14;
+}
+
+/**
+ * Batch queue recovery (cron). Per repo with a queued PR older than the stale age:
+ * - no usable Cursor key: post every queued PR as one ready-to-run prompt and close them ($0, nothing is lost);
+ * - key present: remind once on the newest PR to cut a release. Never launches an agent, so no surprise spend.
+ */
+export async function recoverStaleQueue(now: Date = new Date()): Promise<{ recovered: number; reminded: number }> {
+  const days = staleDays();
+  const out = { recovered: 0, reminded: 0 };
+  if (!days) return out;
+  const cutoff = now.getTime() - days * 24 * 3600 * 1000;
+  const store = getStore();
+  const byRepo = new Map<string, Job[]>();
+  for (const j of (await store.listJobs()).filter((j) => j.status === "queued").reverse()) {
+    const k = `${j.installationId}\t${j.repo}`;
+    byRepo.set(k, [...(byRepo.get(k) ?? []), j]);
+  }
+  for (const queued of byRepo.values()) {
+    if (!queued.some((j) => Date.parse(j.createdAt) <= cutoff)) continue;
+    const { installationId, repo } = queued[0];
+    const newest = queued[queued.length - 1];
+    const list = queued.map((j) => `#${j.prNumber}`).join(", ");
+    try {
+      if (!(await userKey(installationId))) {
+        const cfg = await loadRepoConfig(installationId, repo);
+        const prompt = batchReleasePrompt(repo, queued, cfg);
+        const info: PrInfo = { repo, number: newest.prNumber, title: "", body: "", url: newest.prUrl };
+        await postComment(installationId, repo, newest.prNumber, `${fallbackComment(info, prompt)}\n\n<sub>These ${queued.length} PRs (${list}) were queued for a batch, but this installation has no Cursor key any more.</sub>`);
+        for (const j of queued) { j.status = "done"; j.result = `recovered: prompt posted on #${newest.prNumber}`; await store.putJob(j); }
+        out.recovered += queued.length;
+        continue;
+      }
+      const fresh = queued.filter((j) => !entryOf(j).staleNotifiedAt);
+      if (!fresh.length) continue;
+      const since = queued[0].createdAt.slice(0, 10);
+      const body = queued.every((j) => batchOf(j) === "daily")
+        ? `**Shiplog**: ${queued.length} merged PRs (${list}) have been waiting for the daily batch since ${since}, and the agent launch keeps failing. Check the Cursor key on the Shiplog setup page. Shiplog retries on every cron run.`
+        : `**Shiplog**: ${queued.length} merged PRs (${list}) have been waiting for a release since ${since}. Comment \`/shiplog release vX.Y.Z\` on any PR to ship them in one agent run.`;
+      await postComment(installationId, repo, newest.prNumber, body);
+      for (const j of fresh) { j.result = JSON.stringify({ ...JSON.parse(j.result ?? "{}"), staleNotifiedAt: now.toISOString() }); await store.putJob(j); }
+      out.reminded += fresh.length;
+    } catch (e) { console.error("[shiplog] stale queue recovery failed:", (e as Error).message); }
+  }
+  return out;
 }
 
 /** Cursor agent runs billed to the installation's key. */
