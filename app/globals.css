@@ -78,3 +78,11 @@ footer { padding: 40px 0 24px; color: var(--muted); font-size: .85rem; }
 .rp-left p { margin: 0 0 4px; }
 .rp-left ul { margin: 0; padding-left: 18px; }
 .rp-note { font-size: .85rem; margin-bottom: 0; }
+.rp-notice { background: #E4F4EA; color: #17784A; border-radius: 10px; padding: 10px 14px; font-weight: 600; }
+.rp-notice.off { background: #FDE4E2; color: var(--red-dark); }
+.rp-flush { margin: 4px 0 12px; }
+.rp-flush > summary { list-style: none; padding: 7px 14px; font-size: .88rem; }
+.rp-flush > summary::-webkit-details-marker { display: none; }
+.rp-flush[open] > summary { opacity: .6; }
+.rp-flush form { margin-top: 10px; padding: 12px 14px; border: 1.5px dashed var(--line); border-radius: 10px; }
+.rp-flush form p { margin: 0 0 10px; }

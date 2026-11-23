@@ -54,6 +54,8 @@ export interface RepoReleasePreview {
   /** When the oldest queued PR merged. */
   since: string;
   bullets: PreviewBullet[]; botBullet: string | null; grouped: QueuedEntry[]; skipped: SkippedPr[];
+  /** Changelog files the queued PRs touch: a manual flush starts one agent run per file. 0 means the repo default file. */
+  changelogFiles: string[];
 }
 
 function queuedEntry(j: Job): (QueuedEntry & { batch?: string }) | null {
@@ -90,6 +92,7 @@ export function releasePreviews(jobs: Job[], groupBots: (installationId: string,
         since: items[0].job.createdAt,
         bullets: rest.map((e) => ({ number: e.number, url: e.url, text: e.entry || e.title, section: e.section ?? null, breaking: !!e.breaking, explicit: !!e.entry, bot: !!e.bot })),
         botBullet: bullet, grouped,
+        changelogFiles: [...new Set(entries.flatMap((e) => e.changelogPaths ?? []))],
         skipped: skippedSince(jobs.filter((j) => j.installationId === installationId), repo), // no clock bound: the latest release wins
       };
     });
