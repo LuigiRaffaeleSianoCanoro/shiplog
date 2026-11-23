@@ -13,7 +13,7 @@
     "blob:diagnose": "npx --yes tsx scripts/blob-diagnose.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@vercel/blob": "^2.8.1",
     "next": "^16.4.5",
     "posthog-js": "^1.444.0",
