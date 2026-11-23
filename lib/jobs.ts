@@ -15,6 +15,7 @@ import {
   repoPermission,
   vcsConfigured,
 } from "./vcs";
+import { isBotAuthor, leftOutBlock } from "./release-preview";
 import { DEFAULT_CONFIG, excludedBy, notesEnabled, sectionFor, type ShiplogConfig } from "./config";
 import { loadRepoConfig } from "./repo-config";
 import { allChangelogPaths, changelogTargets } from "./packages";
@@ -178,7 +179,7 @@ function batchReleasePrompt(repo: string, queued: Job[], cfg: ShiplogConfig, ver
     for (const path of paths) byPath.set(path, [...(byPath.get(path) ?? []), e]);
   }
   const date = today();
-  const parts = [...byPath.entries()].map(([path, entries]) => batchPrompt(repo, entries, styleOf(cfg, path), { version, date }, extra, path));
+  const parts = [...byPath.entries()].map(([path, entries]) => batchPrompt(repo, entries, styleOf(cfg, path), { version, date }, extra, path, { groupBots: cfg.groupBots }));
   return parts.length === 1 ? parts[0] : parts.join("\n\n---\n\n");
 }
 
@@ -281,7 +282,9 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
   const { mode, key } = cfg.mode === "prompt" && picked.mode === "cursor" ? { mode: "fallback" as const, key: undefined } : picked;
   const job: Job = { id: randomUUID(), deliveryId, installationId: instId, repo, prNumber, prUrl: info.url, kind, mode, status: "running", createdAt: now };
   const cmd = kind === "changelog" ? await latestPrCommand(instId, repo, prNumber) : null;
-  const skip = kind !== "changelog" ? null : cmd?.kind === "skip" ? "/shiplog skip" : excludedBy(pr, cfg);
+  const excluded = kind === "changelog" ? excludedBy(pr, cfg) : null;
+  // An explicit `/shiplog entry` overrides `skip_types`, never labels or authors.
+  const skip = kind !== "changelog" ? null : cmd?.kind === "skip" ? "/shiplog skip" : cmd?.kind === "entry" && excluded?.startsWith("type ") ? null : excluded;
   const entry = cmd?.kind === "entry" ? cmd.text : undefined;
   if (skip) { job.status = "ignored"; job.result = `excluded by ${skip}`; await store.putJob(job); return job; }
   const changelogPaths = kind === "changelog" ? await targetsForPr(instId, repo, prNumber, cfg) : undefined;
@@ -310,7 +313,7 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
         await postComment(instId, repo, prNumber, `**Shiplog** drafted a changelog entry for this PR:\n\n\`\`\`md\n## [Unreleased]\n\n${job.result}\n\`\`\`\n\n<sub>Test mode (direct model draft). Comment \`/shiplog release vX.Y.Z\` to cut release notes.</sub>`);
         fireUserNotify(instId, cfg, { event: "changelog_entry", repo, prNumber, prUrl: info.url, title: info.title, detail: job.result });
       } else if (mode === "cursor" && cfg.batch !== "off") {
-        const q: QueuedEntry & { batch: string } = { number: prNumber, url: info.url, title: info.title, body: info.body.slice(0, 1000), section: hint, entry, breaking: isBreaking(info.title, info.body), changelogPaths: paths, batch: cfg.batch };
+        const q: QueuedEntry & { batch: string } = { number: prNumber, url: info.url, title: info.title, body: info.body.slice(0, 1000), section: hint, entry, breaking: isBreaking(info.title, info.body), changelogPaths: paths, batch: cfg.batch, ...(isBotAuthor(pr?.author) ? { bot: true } : {}) };
         job.status = "queued"; job.result = JSON.stringify(q);
         await postComment(instId, repo, prNumber, `**Shiplog** queued this PR for the next ${cfg.batch === "daily" ? "daily" : "release"} batch. One agent run will cover every queued PR.`);
       } else if (mode === "cursor") {
@@ -357,8 +360,9 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
         const l = await launchAgent(key!, prompt, repoUrl(repo));
         job.agentId = l.agentId; job.runId = l.runId; job.changelogPaths = releasePaths;
         job.result = `agent ${l.agentId}${queued.length ? ` (${queued.length} queued PRs)` : ""}`;
+        const leftOut = await leftOutSince(instId, repo, cfg, queued);
         await markBatched(queued, job.id);
-        await postComment(instId, repo, prNumber, withNote(`**Shiplog** is cutting **${v}** with a Cursor cloud agent. A release PR will follow.`));
+        await postComment(instId, repo, prNumber, withNote(`**Shiplog** is cutting **${v}** with a Cursor cloud agent. A release PR will follow.${leftOut ? `\n\n${leftOut}` : ""}`));
       } else {
         job.result = releaseAgentPrompt(repo, v, cfg, releaseNoteExtras(cfg, v));
         await postComment(instId, repo, prNumber, withNote(fallbackComment(info, job.result, v)));
@@ -376,6 +380,19 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
 
 const entryOf = (j: Job): QueuedEntry => JSON.parse(j.result ?? "{}");
 const batchOf = (j: Job): string => { try { return JSON.parse(j.result ?? "{}").batch ?? ""; } catch { return ""; } };
+
+/** PRs that will not get their own bullet in this release: grouped bots and changelog jobs skipped since the previous release. */
+async function leftOutSince(installationId: string, repo: string, cfg: ShiplogConfig, queued: Job[]): Promise<string> {
+  const all = (await getStore().listJobs(installationId)).filter((j) => j.repo === repo);
+  const lastRelease = all.filter((j) => j.kind === "release" && j.status !== "ignored" && j.status !== "failed" && j.prNumber !== "")
+    .map((j) => j.createdAt).sort().slice(0, -1).pop(); // the newest one is the release being cut now
+  const skipped = all
+    .filter((j) => j.kind === "changelog" && j.status === "ignored" && j.prNumber && (!lastRelease || j.createdAt > lastRelease))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((j) => ({ number: j.prNumber, reason: (j.result ?? "").replace(/^excluded by /, "") }));
+  const grouped = cfg.groupBots ? queued.map(entryOf).filter((e) => e.bot) : [];
+  return leftOutBlock({ grouped, skipped });
+}
 
 async function queuedFor(installationId: string, repo: string): Promise<Job[]> {
   return (await getStore().listJobs(installationId)).filter((j) => j.status === "queued" && j.repo === repo).reverse();
@@ -411,7 +428,7 @@ export async function flushBatches(): Promise<number> {
       const cfg = await loadRepoConfig(installationId, repo);
       const changelogPath = path === "__default__" ? cfg.changelogPath : path;
       const entries = live.map(entryOf);
-      const l = await launchAgent(key, batchPrompt(repo, entries, styleOf(cfg, changelogPath), undefined, undefined, changelogPath), repoUrl(repo));
+      const l = await launchAgent(key, batchPrompt(repo, entries, styleOf(cfg, changelogPath), undefined, undefined, changelogPath, { groupBots: cfg.groupBots }), repoUrl(repo));
       const job: Job = { id: randomUUID(), deliveryId: `batch-${randomUUID()}`, installationId, repo, prNumber: "", prUrl: repoUrl(repo), kind: "changelog", mode: "cursor", status: "running", agentId: l.agentId, runId: l.runId, changelogPaths: [changelogPath], result: `agent ${l.agentId} (${entries.length} queued PRs)`, createdAt: new Date().toISOString() };
       await store.putJob(job);
       for (const j of live) flushed.add(j.id);

@@ -50,6 +50,8 @@ packages:            # optional monorepo: one changelog per package (roadmap ite
     changelog: packages/api/CHANGELOG.md
 orphan: root         # when packages is set: root = unmatched files use `changelog`; ignore = skip them
 powered_by: true     # show "Changelog by Shiplog" on the public page at /{namespace}/{repo} (default on; set false to hide)
+group_bots: false    # batch mode: fold bot PRs (Dependabot, Renovate, any app) into one "Dependency updates" bullet
+skip_types: []       # conventional types left out, e.g. [chore, ci, test, build]; an installer's /shiplog entry brings a PR back
 ```
 
 Public changelog pages show a small **Changelog by Shiplog** badge by default. Disable it per repo with `powered_by: false` in `.shiplog.yml`.
@@ -114,6 +116,8 @@ Comment on a PR before it merges. Only the installer or someone with write or ad
 Breaking changes (`feat!:` titles or a `BREAKING CHANGE:` footer) are marked `**BREAKING:**` in the changelog, and the release comment suggests a major, minor or patch bump.
 
 The `no-changelog` label always skips a PR, as does any label in `exclude.labels` (default `skip-changelog`).
+
+`skip_types` leaves out PRs by conventional-commit type and records the reason on the job (`excluded by type chore`). With `group_bots: true` and `batch: release` or `batch: daily`, bot PRs skip that type check and land as one bullet, for example `Dependency updates: next 16.4.5 (#69), hono 4.13.18 (#68)`. When a batched release is cut, the release comment ends with **Left out of the changelog, and why**: the grouped bot PRs and each PR skipped since the previous release, with its reason.
 
 ## Embed a "What's new" widget
 
