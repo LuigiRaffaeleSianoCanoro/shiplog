@@ -36,7 +36,7 @@ Use the **Deploy to Vercel** button in the [README](../README.md#self-host), or 
 ### Vercel Hobby limits (be honest)
 
 - Hobby is for **personal, non-commercial** use. Team or commercial hosting needs a paid plan.
-- **Cron** on Hobby runs at most **once per day**. This repo schedules `/api/cron/poll` at 09:00 UTC (`vercel.json`). Agent polling also runs when someone opens the dashboard. For faster polling you can call `/api/cron/poll` yourself with `Authorization: Bearer <CRON_SECRET>` (for example from an external scheduler), or use Supabase `pg_cron` as described in the README.
+- **Cron** on Hobby runs at most **once per day**. This repo schedules `/api/cron/poll` at 09:00 UTC daily and `/api/cron/backfill-namespace-index` at 09:30 UTC on Mondays (`vercel.json`). The backfill rebuilds the namespace index blobs so public pages skip the slow installation scan; after a mass reinstall you can run it yourself with `curl -H "Authorization: Bearer $CRON_SECRET" https://YOUR-DEPLOY/api/cron/backfill-namespace-index`. Agent polling also runs when someone opens the dashboard. For faster polling you can call `/api/cron/poll` yourself with `Authorization: Bearer <CRON_SECRET>` (for example from an external scheduler), or use Supabase `pg_cron` as described in the README.
 - Function duration and bandwidth limits apply; Shiplog keeps webhook work in `after()` and returns 202 quickly.
 
 ## 3. Environment variables

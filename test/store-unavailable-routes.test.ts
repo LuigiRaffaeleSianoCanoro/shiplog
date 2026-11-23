@@ -56,3 +56,23 @@ describe("loadPublicChangelog", () => {
     await expect(loadPublicChangelog("acme", "demo", brokenStore(new Error("boom")))).rejects.toThrow("boom");
   });
 });
+
+describe("feed.json cross-origin reads (widget, roadmap 15)", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("allows any origin to read the public JSON feed without credentials", async () => {
+    const file = `/tmp/shiplog-cors-${Math.random()}.json`;
+    vi.stubEnv("SHIPLOG_DATA_FILE", file);
+    const store = new MemoryStore(file);
+    await store.upsertInstallation({ id: "i1", namespace: "acme", status: "active", createdAt: "2026-01-01" } as never);
+    await store.putChangelog("acme/demo", "# Changelog\n\n## [1.0.0] - 2026-11-01\n\n### Added\n\n- Widget (#1)\n");
+    setStore(store);
+    const res = await feedJson(req("/acme/demo/feed.json"), ctx);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+    expect(res.headers.get("access-control-allow-credentials")).toBeNull();
+    const body = await res.json();
+    expect(body.repo).toBe("acme/demo");
+    expect(body.releases[0].sections.Added).toEqual(["Widget (#1)"]);
+  });
+});
