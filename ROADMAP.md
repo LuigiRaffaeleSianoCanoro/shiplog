@@ -22,7 +22,7 @@ Status key: **Done** is merged on `main`. **Next** is the near-term focus. **Lat
 14. **Read-only API and MCP**: `/api/v1/changelogs/…` and `/api/mcp`, described in [OpenAPI 3.1](docs/openapi/v1-changelogs.yaml) with a drift test (#75)
 15. **In-app "What's new" widget**: `public/widget.js` reads a repo's `feed.json` and shows unread releases in a badge and panel (#72, #73)
 
-**Reliability on `main` (November 2026)**: public changelogs are served with ISR and a narrower middleware (#70). A Blob store that refuses reads returns `503 store_unavailable` instead of 500 on the API, feeds and MCP (#57, #62). `/api/health` proves Blob is readable (#58). The MCP HTTP route has its own tests (#65).
+**Reliability on `main` (November 2026)**: public changelogs are served with ISR and a narrower middleware (#70). A Blob store that refuses reads returns `503 store_unavailable` instead of 500 on the API, feeds and MCP (#57, #62). `/api/health` proves Blob is readable (#58). The MCP HTTP route has its own tests (#65). The read API and MCP have per-IP rate limits (#79), and queued PRs that wait too long get recovered by the daily cron (#80).
 
 **Monetization readiness**
 
@@ -32,9 +32,7 @@ Status key: **Done** is merged on `main`. **Next** is the near-term focus. **Lat
 ## Next
 
 - **Release preview in the dashboard**: show the batch draft next to "Left out of the changelog, and why" (the data shipped in #77). UI, so it needs a design pass first (backlog 21).
-- **Rate limits** for the read API and MCP (backlog 13).
-- **Stale batch queue recovery** (backlog 9).
-- **HTML 503** for public changelog pages when the store is down (backlog 7).
+- **Outage status on public changelog pages**: answer a `no-store` 5xx instead of a 200 when the store is down. In review as #81 (backlog 7).
 - **Origin marketplace publish**: record the public demo video and complete Cursor Origin app review (see [README.md](README.md#publishing-not-done-yet)). Needs the maintainer (backlog 17).
 
 ## Later
