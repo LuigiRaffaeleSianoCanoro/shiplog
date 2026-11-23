@@ -208,4 +208,47 @@ describe("notifyWebhooks delivery (continued)", () => {
     await notifyWebhooks(["ftp://x", "https://good.example/h"], payload);
     expect(f).toHaveBeenCalledTimes(1);
   });
+
+  it("retries right away when Retry-After is 0", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    let n = 0;
+    const f = vi.fn(async () => {
+      n++;
+      return n === 1 ? new Response("slow down", { status: 429, headers: { "Retry-After": "0" } }) : new Response("ok", { status: 200 });
+    });
+    vi.stubGlobal("fetch", f);
+    await notifyWebhooks(["https://example.com/hook"], payload);
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+
+  it("aborts a hanging webhook so delivery finishes within the route budget", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.useFakeTimers();
+    try {
+      const f = vi.fn(
+        (_url: RequestInfo | URL, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(new DOMException("timed out", "TimeoutError")));
+          }),
+      );
+      vi.stubGlobal("fetch", f);
+      let done = false;
+      const p = notifyWebhooks(["https://example.com/hang"], payload).then(() => { done = true; });
+      await vi.advanceTimersByTimeAsync(50_000);
+      expect(done).toBe(true);
+      await p;
+      expect(f).toHaveBeenCalledTimes(NOTIFY_WEBHOOK_MAX_ATTEMPTS);
+      for (const c of f.mock.calls) expect(c[1]?.signal).toBeInstanceOf(AbortSignal);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("logs successful deliveries without console.error", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 200 })));
+    await notifyWebhooks(["https://example.com/ok"], payload);
+    expect(err).not.toHaveBeenCalled();
+  });
 });

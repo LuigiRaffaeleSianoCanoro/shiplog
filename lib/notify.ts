@@ -113,6 +113,8 @@ const NOTIFY_BACKOFF_MAX_MS = 4_000;
 const NOTIFY_RETRY_AFTER_MAX_MS = 10_000;
 /** Total sleep budget across retries for one URL inside a single invocation. */
 const NOTIFY_BACKOFF_BUDGET_MS = 8_000;
+/** Per-attempt fetch timeout. Worst case per URL: 3 x 8s + 8s backoff, under the 60s route limit. */
+const NOTIFY_FETCH_TIMEOUT_MS = 8_000;
 
 export function isRetryableNotifyStatus(status: number): boolean {
   if (status === 408 || status === 429) return true;
@@ -124,7 +126,7 @@ function parseRetryAfterMs(header: string | null, now = Date.now()): number | nu
   if (!header?.trim()) return null;
   const trimmed = header.trim();
   const seconds = Number.parseInt(trimmed, 10);
-  if (!Number.isNaN(seconds)) return seconds * 1000;
+  if (!Number.isNaN(seconds)) return Math.max(0, seconds * 1000);
   const when = Date.parse(trimmed);
   if (!Number.isNaN(when)) return Math.max(0, when - now);
   return null;
@@ -147,7 +149,19 @@ export function notifyRetryDelayMs(
 }
 
 function logNotifyAttempt(fields: Record<string, unknown>): void {
-  console.error(`[shiplog] notify webhook attempt ${JSON.stringify(fields)}`);
+  const line = `[shiplog] notify webhook attempt ${JSON.stringify(fields)}`;
+  if (fields.ok === true) console.info(line);
+  else console.error(line);
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException("notify webhook timed out", "TimeoutError")), NOTIFY_FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function sleep(ms: number): Promise<void> {
@@ -166,7 +180,7 @@ async function deliverNotifyWebhook(url: string, payload: NotifyPayload): Promis
     let ok = false;
 
     try {
-      const r = await fetch(url, {
+      const r = await fetchWithTimeout(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body,
@@ -177,6 +191,8 @@ async function deliverNotifyWebhook(url: string, payload: NotifyPayload): Promis
       } else {
         errorMessage = `HTTP ${r.status}`;
         retryAfter = r.headers.get("Retry-After");
+        // Release the socket before the next attempt.
+        await r.body?.cancel().catch(() => {});
         if (!isRetryableNotifyStatus(r.status)) {
           logNotifyAttempt({
             url: urlRedacted,
@@ -218,13 +234,11 @@ async function deliverNotifyWebhook(url: string, payload: NotifyPayload): Promis
 
     if (!willRetry) return;
 
-    let delay = notifyRetryDelayMs(attempt, retryAfter);
-    if (backoffSpentMs + delay > NOTIFY_BACKOFF_BUDGET_MS) {
-      delay = Math.max(0, NOTIFY_BACKOFF_BUDGET_MS - backoffSpentMs);
-    }
-    if (delay <= 0) return;
+    // Retry-After: 0 means retry now; only an exhausted budget stops retries.
+    if (backoffSpentMs >= NOTIFY_BACKOFF_BUDGET_MS) return;
+    const delay = Math.min(notifyRetryDelayMs(attempt, retryAfter), NOTIFY_BACKOFF_BUDGET_MS - backoffSpentMs);
     backoffSpentMs += delay;
-    await sleep(delay);
+    if (delay > 0) await sleep(delay);
   }
 }
 
