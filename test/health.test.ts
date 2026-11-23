@@ -1,14 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const blobMock = vi.hoisted(() => ({ list: vi.fn() }));
+const blobMock = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn() }));
 
-vi.mock("@vercel/blob", () => ({ list: blobMock.list }));
+vi.mock("@vercel/blob", () => ({ list: blobMock.list, get: blobMock.get }));
 
 describe("/api/health storage readability", () => {
   const prev = { ...process.env };
 
   beforeEach(() => {
     blobMock.list.mockReset();
+    blobMock.get.mockReset();
     process.env = { ...prev };
     vi.resetModules();
   });
@@ -36,5 +37,24 @@ describe("/api/health storage readability", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ ok: true, storage: "vercel-blob", storageReadable: true });
+  });
+
+  it("returns 503 when list works but reading a listed blob is forbidden", async () => {
+    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+    blobMock.list.mockResolvedValue({ blobs: [{ pathname: "shiplog/v1/installations/i1.json" }], hasMore: false });
+    blobMock.get.mockRejectedValue(new Error("Vercel Blob: Failed to fetch blob: 403 Forbidden"));
+    const { GET } = await import("@/app/api/health/route");
+    const res = await GET();
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ ok: false, storageReadable: false });
+  });
+
+  it("returns 200 when a listed blob can be read", async () => {
+    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+    blobMock.list.mockResolvedValue({ blobs: [{ pathname: "shiplog/v1/installations/i1.json" }], hasMore: false });
+    blobMock.get.mockResolvedValue({ stream: new ReadableStream({ start(c) { c.close(); } }) });
+    const { GET } = await import("@/app/api/health/route");
+    const res = await GET();
+    expect(res.status).toBe(200);
   });
 });
