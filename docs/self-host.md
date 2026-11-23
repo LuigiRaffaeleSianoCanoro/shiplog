@@ -107,6 +107,20 @@ Users can install with `https://<your-host>/api/github/install/start` (same `SHI
 
 After deploy, public changelog JSON is available at `/api/v1/changelogs/{namespace}/{repo}` (same visibility rules as `/{namespace}/{repo}`). Monorepo paths use `?changelog=…`. A read-only MCP server is at `/api/mcp` with tools `get_changelog`, `get_release`, and `list_packages`. See the [README](../README.md#read-only-changelog-api-and-mcp-roadmap-item-14) for curl examples and how to add the MCP URL in Cursor.
 
+### Fair use and rate limits
+
+Both surfaces are public and unauthenticated, so Shiplog limits each client IP:
+
+- `SHIPLOG_RATE_LIMIT_API`: requests per minute across the three `/api/v1/changelogs` routes (default 120).
+- `SHIPLOG_RATE_LIMIT_MCP`: requests per minute to `/api/mcp` (default 60).
+- `0` turns a limit off. Any other value that is not a whole number falls back to the default.
+
+Over the limit, the API answers `429 {"error":"rate_limited"}` with `Retry-After` and `Cache-Control: no-store`. MCP answers the same with its CORS headers. Counters live in each function instance's memory, so the limit is per instance and resets on a cold start. It stops one noisy client without any paid service. If you need one global limit, add a rate-limit rule in the Vercel Firewall for `/api/v1/` and `/api/mcp`.
+
+CDN-cached API responses (`s-maxage=300`) do not reach the function and do not count. Clients are keyed by `x-real-ip`, then the first `x-forwarded-for` entry, and IPv6 clients share one budget per /64. Vercel sets those headers itself. If you self-host behind another proxy, it must overwrite them, or clients can pick their own key.
+
+`SHIPLOG_MCP_ALLOWED_ORIGINS` (comma-separated, for example `https://app.example.com`) restricts which **browser** origins may call `/api/mcp`. A request whose `Origin` is not listed gets `403 {"error":"origin_not_allowed"}`, and listed origins are echoed in `Access-Control-Allow-Origin`. Agents and CLIs send no `Origin` header and are not affected. Leave it empty to keep MCP open to any origin (`*`).
+
 ### Set by the platform (do not copy into `.env.local` for Vercel)
 
 - `BLOB_READ_WRITE_TOKEN`, `BLOB_STORE_ID` — injected when a Blob store is linked to the project.

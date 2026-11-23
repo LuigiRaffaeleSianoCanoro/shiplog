@@ -159,6 +159,21 @@ describe("docs/openapi/v1-changelogs.yaml matches the real v1 routes", () => {
     await expectMatches(res, REL, 404);
   });
 
+  it("rate limits answer the documented 429 with Retry-After and no-store on every route", async () => {
+    vi.stubEnv("SHIPLOG_RATE_LIMIT_API", "1");
+    const r = () => new Request("https://shiplog.test/api/v1/changelogs/acme/demo", { headers: { "x-real-ip": `203.0.113.99` } });
+    await getChangelog(r(), ctx(acme)); // spend the minute's budget
+    for (const [res, path] of [
+      [await getChangelog(r(), ctx(acme)), CL],
+      [await getPackages(r(), ctx(acme)), PKG],
+      [await getRelease(r(), ctx({ ...acme, version: "1.0.0" })), REL],
+    ] as const) {
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
+      await expectMatches(res, path, 429);
+    }
+  });
+
   it("store outage answers the documented 503 with no-store on every route", async () => {
     const err = new StoreAuthError("shiplog/v1/");
     setStore(new Proxy({} as Store, { get: (_t, p) => (p === "then" ? undefined : () => Promise.reject(err)) }));
