@@ -56,5 +56,32 @@ describe("/api/health storage readability", () => {
     const { GET } = await import("@/app/api/health/route");
     const res = await GET();
     expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, storage: "vercel-blob", storageReadable: true });
+    expect(blobMock.get).toHaveBeenCalledWith("shiplog/v1/installations/i1.json", expect.objectContaining({ access: "private" }));
+  });
+
+  it("answers 503 within the timeout when the probe hangs", async () => {
+    vi.useFakeTimers();
+    try {
+      process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+      blobMock.list.mockReturnValue(new Promise(() => {}));
+      const { GET } = await import("@/app/api/health/route");
+      const pending = GET();
+      await vi.advanceTimersByTimeAsync(2100);
+      const res = await pending;
+      expect(res.status).toBe(503);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not probe Blob for the memory store", async () => {
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    delete process.env.BLOB_STORE_ID;
+    const { GET } = await import("@/app/api/health/route");
+    const res = await GET();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ storageReadable: true });
+    expect(blobMock.list).not.toHaveBeenCalled();
   });
 });
