@@ -10,7 +10,7 @@ Size: S is under a day, M is 2 to 4 days, L is a week or more. **UI** means the 
 2. **Health proves Blob is readable.** `/api/health` reported healthy from env vars alone. Fixed in #58: it lists and reads one blob, with a timeout, and returns 503 when the read fails.
 3. **MCP tools propagate `StoreAuthError`.** Fixed in #62.
 4. **Dependabot bumps landed.** Merged individually after green CI (#42, #43, #45, #46, #47, #48, #53, #54, #55, #67, #68, #69; #56 is row 16), plus the zod advisory override in #71. The bundle in #60 is left for the maintainer.
-5. **Stale `feat/mvp` guidance removed** from operator docs in #59.
+5. **Stale MVP-branch guidance removed** from operator docs in #59.
 6. **ROADMAP and PROGRESS refreshed for `main`.** This file's PR.
 11. **Notify webhooks retry with backoff.** Fixed in #64: bounded retries, honours `Retry-After`, per-attempt timeout.
 12. **OpenAPI description for `/api/v1/changelogs`.** Added in #75 with a drift test that runs the real route handlers against the spec.
@@ -49,4 +49,4 @@ Do not implement these in maintainer or agent PRs.
 - #37 Spanish README section
 - #38 `ADOPTERS.md` one-line PR instructions
 - #39 "Your first PR in 15 minutes" in CONTRIBUTING. CONTRIBUTING.md has had this section since #31, so the issue looks done; left open for the maintainer to confirm and close.
-- #40 Replace stale `feat/mvp` contributor guidance. #59 removed it from the operator docs, so this one also looks done; same as #39.
+- #40 Replace stale MVP-branch contributor guidance with `main`. #59 removed it from the operator docs, so this one also looks done; same as #39.
