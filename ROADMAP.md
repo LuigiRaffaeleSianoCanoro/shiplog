@@ -22,7 +22,7 @@ Status key: **Done** is merged on `main`. **Next** is the near-term focus. **Lat
 14. **Read-only API and MCP**: `/api/v1/changelogs/…` and `/api/mcp`, described in [OpenAPI 3.1](docs/openapi/v1-changelogs.yaml) with a drift test (#75)
 15. **In-app "What's new" widget**: `public/widget.js` reads a repo's `feed.json` and shows unread releases in a badge and panel (#72, #73)
 
-**Reliability on `main` (November 2026)**: a Blob store that refuses reads returns `503 store_unavailable` instead of 500 on the API, feeds and MCP (#57, #62). `/api/health` proves Blob is readable (#58). The MCP HTTP route has its own tests (#65).
+**Reliability on `main` (November 2026)**: public changelogs are served with ISR and a narrower middleware (#70). A Blob store that refuses reads returns `503 store_unavailable` instead of 500 on the API, feeds and MCP (#57, #62). `/api/health` proves Blob is readable (#58). The MCP HTTP route has its own tests (#65).
 
 **Monetization readiness**
 
@@ -31,18 +31,18 @@ Status key: **Done** is merged on `main`. **Next** is the near-term focus. **Lat
 
 ## Next
 
-- **Release preview in the dashboard**: show the batch draft next to "Left out of the changelog, and why" (the data shipped in #77). UI, so it needs a design pass first.
+- **Release preview in the dashboard**: show the batch draft next to "Left out of the changelog, and why" (the data shipped in #77). UI, so it needs a design pass first (backlog 21).
 - **Rate limits** for the read API and MCP (backlog 13).
 - **Stale batch queue recovery** (backlog 9).
 - **HTML 503** for public changelog pages when the store is down (backlog 7).
-- **Origin marketplace publish**: record the public demo video and complete Cursor Origin app review (see [README.md](README.md#publishing-not-done-yet)). Needs the maintainer.
+- **Origin marketplace publish**: record the public demo video and complete Cursor Origin app review (see [README.md](README.md#publishing-not-done-yet)). Needs the maintainer (backlog 17).
 
 ## Later
 
-16. **Paid hosted Shiplog plan**: hosted offering beyond self-host and BYOK; not scoped yet
+- **Paid hosted Shiplog plan** (roadmap 16): hosted offering beyond self-host and BYOK; not scoped yet (backlog 24)
 - **MCP auth** with per-repo tokens or OAuth (backlog 19)
 - **GitHub Marketplace listing** for the GitHub App (backlog 18)
 
 ## How to contribute
 
-Pick an item, read its row in [docs/BACKLOG.md](docs/BACKLOG.md) and the matching notes in [PROGRESS.md](PROGRESS.md), then open a small PR against `main`. Issues labeled `good first issue` (#33 to #40) are kept for new contributors. For brand use, see [TRADEMARKS.md](TRADEMARKS.md).
+Pick an item, read its row in [docs/BACKLOG.md](docs/BACKLOG.md) and the matching notes in [PROGRESS.md](PROGRESS.md), then open a small PR against `main`. Issues labeled `good first issue` (#33 to #40) are kept for new contributors; see the list in [docs/BACKLOG.md](docs/BACKLOG.md#reserved-for-community-good-first-issue). For brand use, see [TRADEMARKS.md](TRADEMARKS.md).
