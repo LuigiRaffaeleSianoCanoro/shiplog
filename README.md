@@ -190,6 +190,8 @@ Polling: `vercel.json` registers a Vercel Cron job on `GET /api/cron/poll` (dail
 - **Vercel Pro:** change the `schedule` in `vercel.json` (for example `*/15 * * * *` for every 15 minutes). Pro billing applies to the project.
 - **External pinger (free):** call `https://<your-host>/api/cron/poll` on a schedule with `Authorization: Bearer $CRON_SECRET`. A copy-paste GitHub Actions workflow lives at `docs/ci/cron-poll.yml` (public repos get free Actions minutes).
 
+Queued batch PRs never wait silently. After `SHIPLOG_QUEUE_STALE_DAYS` (default 14), the cron poll posts them as one ready-to-run prompt if the Cursor key is gone, or comments once asking for a release. It never launches an agent on its own. See [docs/self-host.md](docs/self-host.md).
+
 The dashboard still calls `pollAgents()` when you open it (no `CRON_SECRET`); it does not flush `batch: daily` queues, so viewing the dashboard does not spend agent credits.
 
 ## Publishing (not done yet)

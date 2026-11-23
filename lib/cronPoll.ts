@@ -1,5 +1,5 @@
 import { safeEqual } from "./crypto";
-import { flushBatches, pollAgents } from "./jobs";
+import { flushBatches, pollAgents, recoverStaleQueue } from "./jobs";
 import { getStore } from "./store";
 
 const defaultLockTtlMs = () => Number(process.env.CRON_POLL_LOCK_TTL_MS) || 90_000;
@@ -12,7 +12,7 @@ export function authorizeCronRequest(req: Request): boolean {
   return Boolean(m && safeEqual(m[1], secret));
 }
 
-export type CronPollResult = { updated: number; batches: number; skipped?: boolean };
+export type CronPollResult = { updated: number; batches: number; skipped?: boolean; stale?: { recovered: number; reminded: number } };
 
 /** Idempotent poll cycle: one active run at a time per store (safe under overlapping cron pings). */
 export async function runCronPoll(): Promise<CronPollResult> {
@@ -22,8 +22,10 @@ export async function runCronPoll(): Promise<CronPollResult> {
   }
   try {
     const batches = await flushBatches();
+    // Recovery must never block agent polling.
+    const stale = await recoverStaleQueue().catch((e) => { console.error("[shiplog] stale queue recovery failed:", (e as Error).message); return { recovered: 0, reminded: 0 }; });
     const updated = await pollAgents();
-    return { updated, batches };
+    return { updated, batches, stale };
   } finally {
     await store.releaseCronPollLock();
   }
