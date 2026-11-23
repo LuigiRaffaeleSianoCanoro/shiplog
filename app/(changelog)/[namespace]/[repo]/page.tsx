@@ -5,8 +5,7 @@ import { SECTIONS } from "@/lib/changelog";
 import { schedulePublicChangelogViewed } from "@/lib/analytics/track";
 import { buildPublicMeta, loadPublicChangelog, publicPageTitle } from "@/lib/public-changelog";
 import { publicSiteOrigin } from "@/lib/request-origin";
-import { StoreUnavailableView } from "@/lib/store-unavailable-view";
-import { getStore } from "@/lib/store";
+import { getStore, StoreAuthError } from "@/lib/store";
 
 export const revalidate = 300;
 
@@ -35,7 +34,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function PublicChangelogPage({ params }: Props) {
   const { namespace, repo } = await params;
   const loaded = await loadPublicChangelog(namespace, repo, getStore());
-  if (loaded.status === "store_unavailable") return <StoreUnavailableView />;
+  // Throw rather than render: ISR keeps serving the last good page, and an uncached render fails with a 5xx
+  // that monitors and CDNs see (error.tsx shows the outage copy). A 200 outage page would be cached for 5 minutes.
+  if (loaded.status === "store_unavailable") throw new StoreAuthError("public changelog");
   if (loaded.status === "not_found") notFound();
   const data = loaded.data;
   schedulePublicChangelogViewed(data.repoSlug);
