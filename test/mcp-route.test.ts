@@ -213,5 +213,17 @@ describe("POST /api/mcp (Streamable HTTP)", () => {
     expect(res.status).toBe(406);
   });
 
-  it.todo("returns store_unavailable over MCP when Blob auth fails (needs PR #62)");
+  it("returns store_unavailable over MCP when Blob auth fails", async () => {
+    const storeMod = await import("@/lib/store");
+    const err = new storeMod.StoreAuthError("shiplog/v1/");
+    storeMod.setStore(
+      new Proxy({} as import("@/lib/store").Store, {
+        get: (_t, prop) => (prop === "then" ? undefined : () => Promise.reject(err)),
+      }),
+    );
+    const out = await callTool("get_changelog", { namespace: "acme", repo: "demo" }, 30);
+    expect(out).toBeDefined();
+    expect(out.result.isError).toBe(true);
+    expect(JSON.parse(out.result.content[0].text)).toEqual({ error: "store_unavailable" });
+  });
 });
