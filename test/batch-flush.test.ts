@@ -85,6 +85,65 @@ describe("manual batch flush (backlog 10)", () => {
     expect((await store.listJobs("i_1")).filter((j: any) => j.status === "queued")).toHaveLength(2);
   });
 
+  it("a double click (two flushes at once) launches one agent", async () => {
+    const { jobs, launches } = await setup("batch: release\n");
+    await queueTwo(jobs);
+    const [a, b] = await Promise.all([jobs.flushRepoNow("i_1", "luigi/demo"), jobs.flushRepoNow("i_1", "luigi/demo")]);
+    expect(launches()).toBe(1);
+    expect([a.status, b.status].sort()).toEqual(["busy", "launched"].sort());
+  });
+
+  it("the daily cron and a click at the same time launch one agent", async () => {
+    const { jobs, launches } = await setup("batch: daily\n");
+    await queueTwo(jobs);
+    await Promise.all([jobs.flushBatches(), jobs.flushRepoNow("i_1", "luigi/demo")]);
+    expect(launches()).toBe(1);
+  });
+
+  it("a failed launch reports failed, keeps the PRs queued, and the next click can retry", async () => {
+    const { store, jobs, launches } = await setup("batch: release\n");
+    await queueTwo(jobs);
+    const f = globalThis.fetch as any;
+    const ok = f.getMockImplementation();
+    f.mockImplementation(async (url: string, init?: any) => (String(url).endsWith("/v1/agents") ? new Response("boom", { status: 500 }) : ok(url, init)));
+    expect(await jobs.flushRepoNow("i_1", "luigi/demo")).toEqual({ status: "failed" });
+    expect((await store.listJobs("i_1")).filter((j: any) => j.status === "queued")).toHaveLength(2);
+    f.mockImplementation(ok);
+    expect(await jobs.flushRepoNow("i_1", "luigi/demo")).toMatchObject({ status: "launched", prs: 2 });
+    expect(launches()).toBe(2); // one failed attempt, one real run
+  });
+
+  it("monorepo: one run per changelog file (default file included), and the preview promises the same number", async () => {
+    const { store, jobs, launches } = await setup("batch: release\n");
+    const q = (n: string, paths?: string[]) => ({ id: `m${n}`, deliveryId: `m${n}`, installationId: "i_1", repo: "luigi/demo", prNumber: n, prUrl: "", kind: "changelog" as const, mode: "cursor" as const, status: "queued" as const, createdAt: new Date().toISOString(),
+      result: JSON.stringify({ number: n, url: "", title: `feat: ${n}`, body: "", section: null, breaking: false, batch: "release", ...(paths ? { changelogPaths: paths } : {}) }) });
+    await store.putJob(q("1", ["packages/a/CHANGELOG.md", "packages/b/CHANGELOG.md"]));
+    await store.putJob(q("2"));
+    const { releasePreviews } = await import("@/lib/release-preview");
+    const [p] = releasePreviews(await store.listJobs("i_1"), () => false);
+    expect(p.changelogFiles).toHaveLength(3);
+    expect(await jobs.flushRepoNow("i_1", "luigi/demo")).toEqual({ status: "launched", agentRuns: 3, prs: 2 });
+    expect(launches()).toBe(3);
+  });
+
+  it("daily cron, monorepo: a PR in two package changelogs reaches both runs (regression)", async () => {
+    const { store, jobs, launches } = await setup("batch: daily\n");
+    await store.putJob({ id: "m1", deliveryId: "m1", installationId: "i_1", repo: "luigi/demo", prNumber: "1", prUrl: "", kind: "changelog", mode: "cursor", status: "queued", createdAt: new Date().toISOString(),
+      result: JSON.stringify({ number: "1", url: "", title: "feat: shared", body: "", section: null, breaking: false, batch: "daily", changelogPaths: ["packages/a/CHANGELOG.md", "packages/b/CHANGELOG.md"] }) });
+    expect(await jobs.flushBatches()).toBe(2);
+    expect(launches()).toBe(2);
+    const prompts = (globalThis.fetch as any).mock.calls.filter((c: any) => String(c[0]).endsWith("/v1/agents")).map((c: any) => JSON.parse(c[1].body).prompt.text as string);
+    expect(prompts.every((t: string) => t.includes('<pr number="1"'))).toBe(true);
+  });
+
+  it("a queued record that is not a batch entry is never swept in", async () => {
+    const { store, jobs, launches } = await setup("batch: release\n");
+    await store.putJob({ id: "odd", deliveryId: "odd", installationId: "i_1", repo: "luigi/demo", prNumber: "9", prUrl: "", kind: "changelog", mode: "cursor", status: "queued", result: "not json", createdAt: new Date().toISOString() });
+    expect(await jobs.flushRepoNow("i_1", "luigi/demo")).toEqual({ status: "empty" });
+    expect(launches()).toBe(0);
+    expect((await store.listJobs("i_1")).find((j: any) => j.id === "odd")!.status).toBe("queued");
+  });
+
   it("only touches the chosen repo", async () => {
     const { store, jobs } = await setup("batch: release\n");
     await queueTwo(jobs);
@@ -95,13 +154,15 @@ describe("manual batch flush (backlog 10)", () => {
 });
 
 describe("POST /api/batch/flush", () => {
-  async function post(form: Record<string, string>, opts: { session?: string; origin?: string } = {}) {
-    const { COOKIE, signSession } = await import("@/lib/session");
-    vi.doMock("next/headers", () => ({ cookies: async () => ({ get: (n: string) => (n === COOKIE && opts.session ? { value: signSession(opts.session) } : undefined) }) }));
-    const { POST: P } = await import("@/app/api/batch/flush/route");
-    return P(new Request("http://localhost:3000/api/batch/flush", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", ...(opts.origin ? { origin: opts.origin } : {}) }, body: new URLSearchParams(form) }));
+  // The cookie jar is read per request, so one mocked module serves every session in a test.
+  let cookie: string | undefined;
+  vi.doMock("next/headers", () => ({ cookies: async () => ({ get: (n: string) => (n === "shiplog_inst" && cookie ? { value: cookie } : undefined) }) }));
+  async function post(form: Record<string, string>, opts: { session?: string; origin?: string; headers?: Record<string, string>; url?: string } = {}) {
+    const { signSession } = await import("@/lib/session");
+    cookie = opts.session ? signSession(opts.session) : undefined;
+    const { POST } = await import("@/app/api/batch/flush/route");
+    return POST(new Request(opts.url ?? "http://localhost:3000/api/batch/flush", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", ...(opts.origin ? { origin: opts.origin } : {}), ...opts.headers }, body: new URLSearchParams(form) }));
   }
-  afterEach(() => vi.doUnmock("next/headers"));
 
   it("with the install session: flushes and redirects back to the dashboard with the result", async () => {
     const { jobs, launches } = await setup("batch: release\n");
@@ -121,7 +182,25 @@ describe("POST /api/batch/flush", () => {
     expect((await post({ installationId: "i_1", repo: "luigi/demo" })).status).toBe(401);
     expect((await post({ installationId: "i_1", repo: "luigi/demo" }, { session: "i_2" })).status).toBe(401);
     expect((await post({ installationId: "i_1", repo: "luigi/demo" }, { session: "i_1", origin: "https://evil.example" })).status).toBe(403);
+    expect((await post({ installationId: "i_1", repo: "luigi/demo" }, { session: "i_1", origin: "null" })).status).toBe(403);
     expect((await post({ installationId: "i_1" }, { session: "i_1" })).status).toBe(400);
+    expect(launches()).toBe(0);
+  });
+
+  it("behind a TLS proxy the browser's https origin is accepted and the redirect stays public", async () => {
+    const { jobs, launches } = await setup("batch: release\n");
+    await queueTwo(jobs);
+    const res = await post({ installationId: "i_1", repo: "luigi/demo" }, { session: "i_1", origin: "https://shiplog.example", url: "http://10.0.0.5:3000/api/batch/flush", headers: { "x-forwarded-host": "shiplog.example", "x-forwarded-proto": "https" } });
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toMatch(/^https:\/\/shiplog\.example\/dashboard\?/);
+    expect(launches()).toBe(1);
+  });
+
+  it("a disconnected installation launches nothing", async () => {
+    const { store, jobs, launches } = await setup("batch: release\n");
+    await queueTwo(jobs);
+    await store.upsertInstallation({ id: "i_1", namespace: "luigi", status: "disconnected", createdAt: "", installerId: "u" });
+    expect((await post({ installationId: "i_1", repo: "luigi/demo" }, { session: "i_1" })).status).toBe(404);
     expect(launches()).toBe(0);
   });
 });

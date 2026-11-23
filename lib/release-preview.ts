@@ -54,14 +54,16 @@ export interface RepoReleasePreview {
   /** When the oldest queued PR merged. */
   since: string;
   bullets: PreviewBullet[]; botBullet: string | null; grouped: QueuedEntry[]; skipped: SkippedPr[];
-  /** Changelog files the queued PRs touch: a manual flush starts one agent run per file. 0 means the repo default file. */
+  /** Changelog files the queued PRs touch (the repo default as `default`): a manual flush starts one agent run per file. */
   changelogFiles: string[];
 }
+
+const DEFAULT_FILE = "default";
 
 function queuedEntry(j: Job): (QueuedEntry & { batch?: string }) | null {
   try {
     const e = JSON.parse(j.result ?? "");
-    return e && typeof e === "object" && typeof e.title === "string" ? e : null;
+    return e && typeof e === "object" && typeof e.title === "string" && (e.batch === "release" || e.batch === "daily") ? e : null;
   } catch { return null; }
 }
 
@@ -92,7 +94,7 @@ export function releasePreviews(jobs: Job[], groupBots: (installationId: string,
         since: items[0].job.createdAt,
         bullets: rest.map((e) => ({ number: e.number, url: e.url, text: e.entry || e.title, section: e.section ?? null, breaking: !!e.breaking, explicit: !!e.entry, bot: !!e.bot })),
         botBullet: bullet, grouped,
-        changelogFiles: [...new Set(entries.flatMap((e) => e.changelogPaths ?? []))],
+        changelogFiles: [...new Set(entries.flatMap((e) => (e.changelogPaths?.length ? e.changelogPaths : [DEFAULT_FILE])))],
         skipped: skippedSince(jobs.filter((j) => j.installationId === installationId), repo), // no clock bound: the latest release wins
       };
     });

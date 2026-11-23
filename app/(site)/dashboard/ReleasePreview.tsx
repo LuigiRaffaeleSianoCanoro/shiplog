@@ -12,6 +12,7 @@ function noticeText(n: FlushNotice): { text: string; ok: boolean } | null {
     case "launched": return { ok: true, text: `Started ${runs(n.runs ?? 1)} for ${n.prs ?? 0} queued PR${n.prs === 1 ? "" : "s"} in ${n.repo}. A changelog PR will follow.` };
     case "empty": return { ok: true, text: `Nothing is queued for ${n.repo} any more. Another run may already have picked it up.` };
     case "no_key": return { ok: false, text: `${n.repo} needs a Cursor key before a batch can run.` };
+    case "busy": return { ok: true, text: `Another run is already starting for ${n.repo}. Refresh in a minute to see it under Recent jobs.` };
     case "failed": return { ok: false, text: `The agent launch for ${n.repo} failed. The PRs are still queued; check the Cursor key and try again.` };
     default: return null;
   }
@@ -31,7 +32,7 @@ export function ReleasePreview({ previews, flushAccess = () => null, notice }: {
         const count = p.bullets.length + p.grouped.length;
         const ungroupedBots = p.bullets.filter((b) => b.bot).length;
         const access = flushAccess(p.installationId);
-        const agentRuns = Math.max(1, p.changelogFiles.length);
+        const agentRuns = p.changelogFiles.length;
         return (
           <section key={`${p.installationId}/${p.repo}`} className="rp-repo">
             <div className="rp-head">
