@@ -192,7 +192,7 @@ describe("POST /api/mcp (Streamable HTTP)", () => {
 
   it("OPTIONS returns CORS preflight headers", async () => {
     const { OPTIONS } = await import("@/app/api/mcp/route");
-    const res = await OPTIONS();
+    const res = await OPTIONS(new Request("https://shiplog.example/api/mcp", { method: "OPTIONS" }));
     expect(res.status).toBe(204);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(res.headers.get("Access-Control-Allow-Methods")).toMatch(/POST/);

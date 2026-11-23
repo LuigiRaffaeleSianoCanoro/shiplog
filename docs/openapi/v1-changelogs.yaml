@@ -6,6 +6,7 @@ info:
   description: |
     Public, unauthenticated, read-only. Data is the same as the public changelog page.
     Successful responses are cached at the edge for 5 minutes (`public, s-maxage=300, stale-while-revalidate=600`).
+    Per-IP fair use: 120 requests per minute per function instance by default. Over budget returns 429 with Retry-After and no-store. CDN cache hits do not count.
     `test/openapi-drift.test.ts` checks this file against the real route handlers.
   license:
     name: Apache-2.0
@@ -35,6 +36,8 @@ paths:
               schema: { $ref: "#/components/schemas/Changelog" }
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/StoreUnavailable"
   /api/v1/changelogs/{namespace}/{repo}/packages:
@@ -52,6 +55,8 @@ paths:
               schema: { $ref: "#/components/schemas/PackageListing" }
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/StoreUnavailable"
   /api/v1/changelogs/{namespace}/{repo}/releases/{version}:
@@ -85,6 +90,8 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/NotFoundError"
                   - $ref: "#/components/schemas/ReleaseNotFoundError"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/StoreUnavailable"
 components:
@@ -111,6 +118,20 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/StoreUnavailableError" }
+    RateLimited:
+      description: "Per-IP budget spent for this minute. Retry after the number of seconds in Retry-After. Not cached (cache-control: no-store)."
+      headers:
+        Retry-After:
+          description: Seconds until this IP's window resets.
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error: { type: string, const: rate_limited }
+            additionalProperties: false
   schemas:
     Sections:
       type: object

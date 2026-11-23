@@ -1,3 +1,4 @@
+import { rateLimited } from "@/lib/rate-limit";
 import { getReleaseApiResponse, jsonResponse, withStoreAuth } from "@/lib/changelog-api-http";
 import { scheduleApiRead } from "@/lib/analytics/track";
 import { publicSiteOrigin } from "@/lib/request-origin";
@@ -8,6 +9,8 @@ export const revalidate = 300;
 type Ctx = { params: Promise<{ namespace: string; repo: string; version: string }> };
 
 export async function GET(req: Request, ctx: Ctx) {
+  const limited = rateLimited(req, "api");
+  if (limited) return limited;
   return withStoreAuth(async () => {
     const { namespace, repo, version } = await ctx.params;
     const origin = publicSiteOrigin();
