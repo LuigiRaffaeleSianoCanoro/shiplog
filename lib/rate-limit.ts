@@ -26,11 +26,21 @@ export function createRateLimiter({ limit, windowMs, maxKeys = 10_000, now = Dat
   };
 }
 
-/** Vercel sets x-real-ip and x-forwarded-for to the client address. */
+/** Vercel sets x-real-ip and x-forwarded-for to the client address. Behind another proxy, it must overwrite them. */
 export function clientIp(req: Request): string {
   const real = req.headers.get("x-real-ip")?.trim();
   if (real) return real;
   return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+}
+
+/** One budget per IPv4 address or per IPv6 /64, since a single client usually owns a whole /64. */
+export function limitKey(ip: string): string {
+  if (!ip.includes(":")) return ip;
+  const [head, tail = ""] = ip.toLowerCase().split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  const full = ip.includes("::") ? [...left, ...Array(8 - left.length - right.length).fill("0"), ...right] : left;
+  return `${full.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":")}::/64`;
 }
 
 const BUCKETS = {
@@ -55,7 +65,7 @@ export function rateLimited(req: Request, bucket: Bucket, extraHeaders: Record<s
   const id = `${bucket}:${limit}`;
   let rl = limiters.get(id);
   if (!rl) limiters.set(id, (rl = createRateLimiter({ limit, windowMs: 60_000 })));
-  const r = rl.hit(clientIp(req));
+  const r = rl.hit(limitKey(clientIp(req)));
   if (r.ok) return null;
   return new Response(JSON.stringify({ error: "rate_limited" }), {
     status: 429,

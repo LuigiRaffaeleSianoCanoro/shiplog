@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { addEntry } from "@/lib/changelog";
-import { clientIp, createRateLimiter } from "@/lib/rate-limit";
+import { clientIp, createRateLimiter, limitKey } from "@/lib/rate-limit";
 
 vi.mock("next/headers", () => ({ headers: vi.fn(async () => new Headers({ host: "shiplog.example" })) }));
 
@@ -113,13 +113,39 @@ describe("MCP rate limit and origin allowlist", () => {
     expect((await mcp.OPTIONS(fromIp("/api/mcp", "198.51.100.7", { method: "OPTIONS" }))).status).toBe(204);
   });
 
+  it("MCP 429 is not cacheable, and GET, POST and DELETE share the MCP budget", async () => {
+    vi.stubEnv("SHIPLOG_RATE_LIMIT_MCP", "2");
+    const mcp = await import("@/app/api/mcp/route");
+    await mcp.POST(mcpPost("198.51.100.11"));
+    await mcp.GET(fromIp("/api/mcp", "198.51.100.11", { headers: { accept: "text/event-stream" } }));
+    const res = await mcp.DELETE(fromIp("/api/mcp", "198.51.100.11", { method: "DELETE" }));
+    expect(res.status).toBe(429);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  });
+
   it("the MCP and read API budgets are separate", async () => {
     vi.stubEnv("SHIPLOG_RATE_LIMIT_MCP", "1");
     vi.stubEnv("SHIPLOG_RATE_LIMIT_API", "1");
     const mcp = await import("@/app/api/mcp/route");
     const { GET } = await import("@/app/api/v1/changelogs/[namespace]/[repo]/route");
     expect((await mcp.POST(mcpPost("198.51.100.8"))).status).toBe(200);
+    expect((await mcp.POST(mcpPost("198.51.100.8"))).status).toBe(429);
     expect((await GET(fromIp("/api/v1/changelogs/acme/demo", "198.51.100.8"), ctx)).status).toBe(200);
+    expect((await GET(fromIp("/api/v1/changelogs/acme/demo", "198.51.100.8"), ctx)).status).toBe(429);
+  });
+
+  it("MCP defaults to 60 per minute and SHIPLOG_RATE_LIMIT_MCP=0 turns it off", async () => {
+    const mcp = await import("@/app/api/mcp/route");
+    const codes: number[] = [];
+    for (let i = 0; i < 61; i++) codes.push((await mcp.OPTIONS(fromIp("/api/mcp", "198.51.100.12", { method: "OPTIONS" }))).status);
+    for (let i = 0; i < 61; i++) codes.push((await mcp.DELETE(fromIp("/api/mcp", "198.51.100.12", { method: "DELETE" }))).status);
+    expect(codes.slice(0, 61).every((c) => c === 204)).toBe(true);
+    expect(codes.slice(61, 121).every((c) => c !== 429)).toBe(true);
+    expect(codes[121]).toBe(429);
+    vi.stubEnv("SHIPLOG_RATE_LIMIT_MCP", "0");
+    const off: number[] = [];
+    for (let i = 0; i < 70; i++) off.push((await mcp.DELETE(fromIp("/api/mcp", "198.51.100.13", { method: "DELETE" }))).status);
+    expect(off).not.toContain(429);
   });
 
   it("with SHIPLOG_MCP_ALLOWED_ORIGINS, browsers from other origins get 403 and allowed ones get their origin echoed", async () => {
@@ -135,7 +161,21 @@ describe("MCP rate limit and origin allowlist", () => {
     // Agents outside a browser send no Origin header and are not affected.
     expect((await mcp.POST(mcpPost("198.51.100.9"))).status).toBe(200);
     const pre = await mcp.OPTIONS(fromIp("/api/mcp", "198.51.100.9", { method: "OPTIONS", headers: { origin: "https://evil.example" } }));
+    expect(pre.status).toBe(204);
     expect(pre.headers.get("access-control-allow-origin")).toBeNull();
+    const okPre = await mcp.OPTIONS(fromIp("/api/mcp", "198.51.100.9", { method: "OPTIONS", headers: { origin: "https://app.example" } }));
+    expect(okPre.headers.get("access-control-allow-origin")).toBe("https://app.example");
+  });
+
+  it("allowlist entries match regardless of case and trailing slash; refused origins do not spend the budget; 429 keeps the echoed origin", async () => {
+    vi.stubEnv("SHIPLOG_MCP_ALLOWED_ORIGINS", "https://App.Example/");
+    vi.stubEnv("SHIPLOG_RATE_LIMIT_MCP", "1");
+    const mcp = await import("@/app/api/mcp/route");
+    for (let i = 0; i < 3; i++) expect((await mcp.POST(mcpPost("198.51.100.14", { origin: "https://evil.example" }))).status).toBe(403);
+    expect((await mcp.POST(mcpPost("198.51.100.14", { origin: "https://app.example" }))).status).toBe(200);
+    const limited = await mcp.POST(mcpPost("198.51.100.14", { origin: "https://app.example" }));
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("access-control-allow-origin")).toBe("https://app.example");
   });
 
   it("without an allowlist MCP stays open to any origin", async () => {
@@ -145,3 +185,21 @@ describe("MCP rate limit and origin allowlist", () => {
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
   });
 });
+
+describe("limitKey", () => {
+  it("keys IPv4 by address and IPv6 by /64", () => {
+    expect(limitKey("203.0.113.9")).toBe("203.0.113.9");
+    expect(limitKey("2001:db8:abcd:12:1::5")).toBe("2001:db8:abcd:12::/64");
+    expect(limitKey("2001:DB8:abcd:0012:ffff:1:2:3")).toBe("2001:db8:abcd:12::/64");
+    expect(limitKey("2001:db8::1")).toBe("2001:db8:0:0::/64");
+  });
+
+  it("two addresses in one IPv6 /64 share a budget on the API", async () => {
+    vi.stubEnv("SHIPLOG_RATE_LIMIT_API", "1");
+    const { GET } = await import("@/app/api/v1/changelogs/[namespace]/[repo]/route");
+    expect((await GET(fromIp("/api/v1/changelogs/acme/demo", "2001:db8:1:2::a"), ctx)).status).toBe(200);
+    expect((await GET(fromIp("/api/v1/changelogs/acme/demo", "2001:db8:1:2::b"), ctx)).status).toBe(429);
+    expect((await GET(fromIp("/api/v1/changelogs/acme/demo", "2001:db8:1:3::a"), ctx)).status).toBe(200);
+  });
+});
+
