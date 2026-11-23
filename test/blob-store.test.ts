@@ -20,6 +20,24 @@ vi.mock("@vercel/blob", () => ({
       this.name = "BlobNotFoundError";
     }
   },
+  BlobAccessError: class BlobAccessError extends Error {
+    constructor() {
+      super("Vercel Blob: Access denied, please provide a valid token for this resource.");
+      this.name = "BlobAccessError";
+    }
+  },
+  BlobStoreNotFoundError: class BlobStoreNotFoundError extends Error {
+    constructor() {
+      super("Vercel Blob: This store does not exist.");
+      this.name = "BlobStoreNotFoundError";
+    }
+  },
+  BlobStoreSuspendedError: class BlobStoreSuspendedError extends Error {
+    constructor() {
+      super("Vercel Blob: This store has been suspended.");
+      this.name = "BlobStoreSuspendedError";
+    }
+  },
   BlobError: class BlobError extends Error {
     constructor(message: string) {
       super(message);
@@ -30,7 +48,7 @@ vi.mock("@vercel/blob", () => ({
 
 const { get, head, list, put, del } = blobMock;
 
-import { BlobNotFoundError } from "@vercel/blob";
+import { BlobAccessError, BlobNotFoundError, BlobStoreNotFoundError, BlobStoreSuspendedError } from "@vercel/blob";
 import { BlobStore } from "@/lib/store/blob";
 import { StoreAuthError } from "@/lib/store/store-auth-error";
 
@@ -104,6 +122,10 @@ describe("BlobStore readJson 403 disambiguation", () => {
 });
 
 describe("changelog API store auth", () => {
+  beforeEach(() => {
+    for (const fn of [get, head, list, put, del]) fn.mockReset();
+  });
+
   it("maps StoreAuthError to 503 store_unavailable JSON", async () => {
     const { jsonResponse, withStoreAuth } = await import("@/lib/changelog-api-http");
     const err = new StoreAuthError("luigi");
@@ -112,5 +134,30 @@ describe("changelog API store auth", () => {
     if (!(res instanceof Response)) throw new Error("expected Response");
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: "store_unavailable" });
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it.each([
+    ["BlobAccessError", () => new BlobAccessError()],
+    ["BlobStoreNotFoundError", () => new BlobStoreNotFoundError()],
+    ["BlobStoreSuspendedError", () => new BlobStoreSuspendedError()],
+  ])("throws StoreAuthError when get is 403 and head fails with %s", async (_name, makeErr) => {
+    const store = new BlobStore();
+    get.mockRejectedValue(blob403());
+    head.mockRejectedValue(makeErr());
+    await expect(store.getChangelog("acme/demo")).rejects.toBeInstanceOf(StoreAuthError);
+  });
+
+  it("throws StoreAuthError when list fails because the store is missing", async () => {
+    const store = new BlobStore();
+    list.mockRejectedValue(new BlobStoreNotFoundError());
+    await expect(store.listInstallations()).rejects.toBeInstanceOf(StoreAuthError);
+    await expect(store.listChangelogKeysForRepo("acme/demo")).rejects.toBeInstanceOf(StoreAuthError);
+  });
+
+  it("throws StoreAuthError when get fails with a typed access error", async () => {
+    const store = new BlobStore();
+    get.mockRejectedValue(new BlobAccessError());
+    await expect(store.getChangelog("acme/demo")).rejects.toBeInstanceOf(StoreAuthError);
   });
 });

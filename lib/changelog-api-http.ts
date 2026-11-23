@@ -16,7 +16,12 @@ export async function withStoreAuth<T>(work: () => Promise<T>): Promise<T | Resp
   try {
     return await work();
   } catch (err) {
-    if (isStoreAuthError(err)) return jsonResponse({ error: "store_unavailable" }, 503);
+    if (isStoreAuthError(err)) {
+      // Outages must not be cached by the CDN like normal reads.
+      const res = jsonResponse({ error: "store_unavailable" }, 503);
+      res.headers.set("cache-control", "no-store");
+      return res;
+    }
     throw err;
   }
 }

@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { headers } from "next/headers";
 import { SECTIONS } from "@/lib/changelog";
-import { trackPublicChangelogViewed } from "@/lib/analytics/track";
+import { schedulePublicChangelogViewed } from "@/lib/analytics/track";
 import { buildPublicMeta, loadPublicChangelog, publicPageTitle } from "@/lib/public-changelog";
-import { requestOrigin } from "@/lib/request-origin";
+import { publicSiteOrigin } from "@/lib/request-origin";
 import { StoreUnavailableView } from "@/lib/store-unavailable-view";
 import { getStore } from "@/lib/store";
 
@@ -20,8 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (loaded.status === "not_found") return { title: "Not found" };
   const data = loaded.data;
   const title = publicPageTitle(namespace, repo);
-  const origin = await requestOrigin();
-  const pageUrl = buildPublicMeta(origin, namespace, repo).pageUrl;
+  const pageUrl = buildPublicMeta(publicSiteOrigin(), namespace, repo).pageUrl;
   return {
     title,
     description: `Public changelog for ${data.repoSlug}`,
@@ -40,9 +38,8 @@ export default async function PublicChangelogPage({ params }: Props) {
   if (loaded.status === "store_unavailable") return <StoreUnavailableView />;
   if (loaded.status === "not_found") notFound();
   const data = loaded.data;
-  const ua = (await headers()).get("user-agent");
-  await trackPublicChangelogViewed(data.repoSlug, ua);
-  const origin = await requestOrigin();
+  schedulePublicChangelogViewed(data.repoSlug);
+  const origin = publicSiteOrigin();
   const pageUrl = buildPublicMeta(origin, namespace, repo).pageUrl;
   const releases = data.document.releases.filter(
     (r) => r.version !== "Unreleased" || SECTIONS.some((s) => r.sections[s].length),

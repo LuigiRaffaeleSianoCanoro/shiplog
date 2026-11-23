@@ -1,9 +1,6 @@
-import { Inter, Oswald } from "next/font/google";
 import "./changelog.css";
 
-const display = Oswald({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-changelog-display" });
-const body = Inter({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-changelog-body" });
-
+/** Fonts come from root `app/layout.tsx` (`--font-display`, `--font-manrope`) — no second Google fetch. */
 export default function ChangelogLayout({ children }: { children: React.ReactNode }) {
-  return <div className={`changelog-root ${display.variable} ${body.variable}`}>{children}</div>;
+  return <div className="changelog-root">{children}</div>;
 }

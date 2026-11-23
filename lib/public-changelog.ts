@@ -178,7 +178,7 @@ export async function loadPublicChangelog(
   store: Store,
 ): Promise<PublicChangelogLoad> {
   try {
-    const data = await resolvePublicChangelogUncached(namespace, repo, store);
+    const data = await resolvePublicChangelog(namespace, repo, store);
     return data ? { status: "ok", data } : { status: "not_found" };
   } catch (err) {
     if (isStoreAuthError(err)) return { status: "store_unavailable" };
