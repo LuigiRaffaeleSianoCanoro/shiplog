@@ -37,6 +37,33 @@ function documentedInEnvExample(name: string, text: string): boolean {
   return new RegExp(`^${name}\\s*=`, "m").test(text) || new RegExp(`^#\\s*${name}\\b`, "m").test(text);
 }
 
+function docsMdFiles(): string[] {
+  const docsDir = join(ROOT, "docs");
+  const out: string[] = [];
+  for (const name of readdirSync(docsDir)) {
+    const p = join(docsDir, name);
+    if (statSync(p).isDirectory()) out.push(...listTsFiles(p).filter((f) => f.endsWith(".md")));
+    else if (name.endsWith(".md")) out.push(p);
+  }
+  return out;
+}
+
+describe("feat/mvp doc hygiene (#40)", () => {
+  const paths = [
+    join(ROOT, "README.md"),
+    join(ROOT, "CONTRIBUTING.md"),
+    ...docsMdFiles(),
+  ];
+
+  for (const file of paths) {
+    const rel = relative(ROOT, file);
+    it(`${rel} has no feat/mvp references`, () => {
+      const text = readFileSync(file, "utf8");
+      expect(text.includes("feat/mvp")).toBe(false);
+    });
+  }
+});
+
 describe("environment variable documentation", () => {
   const codeVars = envVarsInCode();
   const envExample = readFileSync(ENV_EXAMPLE, "utf8");
