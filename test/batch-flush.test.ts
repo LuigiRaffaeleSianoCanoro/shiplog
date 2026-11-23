@@ -161,6 +161,26 @@ describe("manual batch flush (backlog 10)", () => {
     expect((await store.listJobs("i_1")).find((j: any) => j.id === "m1")!.status).toBe("done");
   });
 
+  it("a slow flush stops starting runs before its lock expires and leaves the rest queued", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const { store, jobs } = await setup("batch: release\n");
+    await store.putJob({ id: "m1", deliveryId: "m1", installationId: "i_1", repo: "luigi/demo", prNumber: "1", prUrl: "", kind: "changelog", mode: "cursor", status: "queued", createdAt: new Date().toISOString(),
+      result: JSON.stringify({ number: "1", url: "", title: "feat: shared", body: "", section: null, breaking: false, batch: "release", changelogPaths: ["packages/a/CHANGELOG.md", "packages/b/CHANGELOG.md"] }) });
+    const f = globalThis.fetch as any;
+    const ok = f.getMockImplementation();
+    f.mockImplementation(async (url: string, init?: any) => { if (String(url).endsWith("/v1/agents")) vi.setSystemTime(Date.now() + 110_000); return ok(url, init); });
+    expect(await jobs.flushRepoNow("i_1", "luigi/demo")).toEqual({ status: "launched", agentRuns: 1, prs: 1, failedRuns: 1 });
+    expect(JSON.parse((await store.listJobs("i_1")).find((j: any) => j.id === "m1")!.result!).changelogPaths).toEqual(["packages/b/CHANGELOG.md"]);
+    expect(await store.acquireCronPollLock(1000)).toBe(false); // past the deadline it did not release a lease that may be someone else's
+  });
+
+  it("after a normal flush the lock is released for the cron", async () => {
+    const { store, jobs } = await setup("batch: release\n");
+    await queueTwo(jobs);
+    await jobs.flushRepoNow("i_1", "luigi/demo");
+    expect(await store.acquireCronPollLock(1000)).toBe(true);
+  });
+
   it("queued records from before the batch field was stored still flush", async () => {
     const { store, jobs } = await setup("batch: release\n");
     await store.putJob({ id: "old", deliveryId: "old", installationId: "i_1", repo: "luigi/demo", prNumber: "3", prUrl: "", kind: "changelog", mode: "cursor", status: "queued", createdAt: new Date().toISOString(),
@@ -240,6 +260,22 @@ describe("POST /api/batch/flush", () => {
     expect(launches()).toBe(1);
     const forged = await post({ installationId: "i_1", repo: "luigi/demo" }, { session: "i_1", origin: "https://evil.example", headers: { host: "shiplog.example", "x-forwarded-host": "evil.example" } });
     expect(forged.status).toBe(403);
+  });
+
+  it("each outcome reaches the dashboard: empty and no_key", async () => {
+    const { store, jobs } = await setup("batch: release\n");
+    const flushOf = async () => new URL((await post({ installationId: "i_1", repo: "luigi/demo" }, { session: "i_1" })).headers.get("location")!, "http://x").searchParams.get("flush");
+    expect(await flushOf()).toBe("empty");
+    await queueTwo(jobs);
+    await store.deleteKey("i_1");
+    expect(await flushOf()).toBe("no_key");
+  });
+
+  it("SHIPLOG_INSTALL_ORIGIN is accepted even when Host differs (custom domain in front)", async () => {
+    const { jobs } = await setup("batch: release\n");
+    vi.stubEnv("SHIPLOG_INSTALL_ORIGIN", "https://changelog.example.com");
+    await queueTwo(jobs);
+    expect((await post({ installationId: "i_1", repo: "luigi/demo" }, { session: "i_1", origin: "https://changelog.example.com", headers: { host: "internal:3000" } })).status).toBe(303);
   });
 
   it("a disconnected installation launches nothing", async () => {

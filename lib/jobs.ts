@@ -421,11 +421,13 @@ function groupByChangelog(queued: Job[]): BatchGroup[] {
  * A PR in several changelog files stays queued, with the files still to do, until every file's run has launched;
  * a failed launch leaves exactly the failed files queued for the next try.
  */
-async function launchBatches(groups: BatchGroup[], stillQueued: (j: Job) => boolean): Promise<{ launched: number; prs: number; failed: number }> {
+async function launchBatches(groups: BatchGroup[], stillQueued: (j: Job) => boolean, deadline = Infinity): Promise<{ launched: number; prs: number; failed: number }> {
   const store = getStore();
   let launched = 0, failed = 0;
   const done = new Set<string>();
   for (const { installationId, repo, path, jobs: grp } of groups) {
+    // Past the deadline the lock may have expired: leave the rest queued (reported as failed) rather than race another holder.
+    if (Date.now() > deadline) { failed++; continue; }
     const ids = new Set(grp.map((j) => j.id));
     const live = (await store.listJobs()).filter((j) => ids.has(j.id) && j.status === "queued" && stillQueued(j))
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -469,6 +471,7 @@ export type FlushResult =
 
 /** How long a manual flush may hold the cron poll lock before it counts as abandoned. */
 const FLUSH_LOCK_TTL_MS = 120_000;
+const FLUSH_LOCK_MARGIN_MS = 30_000;
 
 /** Queued for a batch with a readable entry. Records from before `batch` was stored count as release batches. */
 function isBatchQueued(j: Job): boolean {
@@ -488,13 +491,16 @@ export async function flushRepoNow(installationId: string, repo: string): Promis
   if (!(await userKey(installationId))) return { status: "no_key" };
   // Same lock as the cron poll: a click during the cron, or two clicks at once, wait instead of launching twice. The TTL frees it after a crash.
   if (!(await store.acquireCronPollLock(FLUSH_LOCK_TTL_MS))) return { status: "busy" };
+  // Stop starting runs well before the lease expires, and don't release a lease that may now belong to someone else.
+  const deadline = Date.now() + FLUSH_LOCK_TTL_MS - FLUSH_LOCK_MARGIN_MS;
   try {
     const queued = await queuedNow();
     if (!queued.length) return { status: "empty" };
-    const { launched, prs, failed } = await launchBatches(groupByChangelog(queued), isBatchQueued);
-    return launched ? { status: "launched", agentRuns: launched, prs, failedRuns: failed } : { status: "failed" };
+    const { launched, prs, failed } = await launchBatches(groupByChangelog(queued), isBatchQueued, deadline);
+    if (launched) return { status: "launched", agentRuns: launched, prs, failedRuns: failed };
+    return failed ? { status: "failed" } : { status: "empty" };
   } finally {
-    await store.releaseCronPollLock();
+    if (Date.now() <= deadline + FLUSH_LOCK_MARGIN_MS / 2) await store.releaseCronPollLock();
   }
 }
 

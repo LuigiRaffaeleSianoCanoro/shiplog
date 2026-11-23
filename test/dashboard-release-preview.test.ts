@@ -155,6 +155,17 @@ describe("dashboard page renders the release preview", () => {
     expect(web.replace(/<!-- -->/g, "")).toContain(">Start 1 agent run</button>");
   });
 
+  it("a monorepo repo promises one run per changelog file in the form", async () => {
+    const { ReleasePreview } = await import("@/app/(site)/dashboard/ReleasePreview");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const mono = [queued("1", "feat: a", "2026-11-02T00:00:00Z", { changelogPaths: ["packages/a/CHANGELOG.md", "packages/b/CHANGELOG.md"] })];
+    const html = renderToStaticMarkup(createElement(ReleasePreview, { previews: releasePreviews(mono, () => false), flushAccess: () => ({ kind: "ready" as const, keyLast4: "1234" }) })).replace(/<!-- -->/g, "");
+    expect(html).toContain("Starts 2 agent runs on your Cursor key");
+    expect(html).toContain(", one per changelog file");
+    expect(html).toContain(">Start 2 agent runs</button>");
+  });
+
   it("the operator overview never offers the flush (it would spend someone else's key)", async () => {
     const { panel } = await render({ token: "op-token-123" }, undefined, [], { key: true });
     expect(panel).not.toContain("/api/batch/flush");
@@ -178,6 +189,13 @@ describe("dashboard page renders the release preview", () => {
     expect(partial.panel.replace(/<!-- -->/g, "")).toContain("1 changelog file failed to start");
     const forged = await render({ installation_id: "i1", flush: "launched", repo: "<script>" }, undefined);
     expect(forged.html).not.toContain("Started");
+    const operator = await render({ token: "op-token-123", installation_id: "i1", flush: "launched", repo: "acme/web", prs: "1", runs: "1" });
+    expect(operator.html).not.toContain("Started 1 agent run");
+    const otherSession = await render({ installation_id: "i1", flush: "launched", repo: "acme/web", prs: "1", runs: "1" }, "i2");
+    expect(otherSession.html).not.toContain("Started 1 agent run");
+    const escaped = await render({ installation_id: "i1", flush: "empty", repo: "<img src=x onerror=alert(1)>" }, "i1", [], { key: true });
+    expect(escaped.panel).not.toContain("<img src=x");
+    expect(escaped.panel).toContain("&lt;img");
   });
 
   it("no auth, no preview", async () => {
