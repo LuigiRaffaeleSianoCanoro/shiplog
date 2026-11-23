@@ -58,6 +58,8 @@ describe("loadPublicChangelog", () => {
 });
 
 describe("feed.json cross-origin reads (widget, roadmap 15)", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it("allows any origin to read the public JSON feed without credentials", async () => {
     const file = `/tmp/shiplog-cors-${Math.random()}.json`;
     vi.stubEnv("SHIPLOG_DATA_FILE", file);
@@ -69,6 +71,8 @@ describe("feed.json cross-origin reads (widget, roadmap 15)", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
     expect(res.headers.get("access-control-allow-credentials")).toBeNull();
-    vi.unstubAllEnvs();
+    const body = await res.json();
+    expect(body.repo).toBe("acme/demo");
+    expect(body.releases[0].sections.Added).toEqual(["Widget (#1)"]);
   });
 });
