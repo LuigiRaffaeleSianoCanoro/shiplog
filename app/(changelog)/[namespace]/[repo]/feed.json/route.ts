@@ -27,6 +27,8 @@ export async function GET(req: Request, ctx: Ctx) {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "public, s-maxage=300, stale-while-revalidate=600",
+      // Public read-only data; the embeddable widget fetches it from other sites.
+      "access-control-allow-origin": "*",
     },
   });
 }
