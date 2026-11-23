@@ -36,10 +36,10 @@ export function leftOutBlock({ grouped, skipped }: { grouped: QueuedEntry[]; ski
   return lines.join("\n");
 }
 
-/** Changelog jobs skipped (`ignored`) since the latest release at or before `at`, oldest first. */
-export function skippedSince(jobs: Job[], repo: string, at: string): SkippedPr[] {
+/** Changelog jobs skipped (`ignored`) since the latest release (at or before `at` when given), oldest first. */
+export function skippedSince(jobs: Job[], repo: string, at?: string): SkippedPr[] {
   const mine = jobs.filter((j) => j.repo === repo);
-  const lastRelease = mine.filter((j) => j.kind === "release" && j.status !== "ignored" && j.status !== "failed" && j.createdAt <= at)
+  const lastRelease = mine.filter((j) => j.kind === "release" && j.status !== "ignored" && j.status !== "failed" && (at === undefined || j.createdAt <= at))
     .map((j) => j.createdAt).sort().pop();
   return mine
     .filter((j) => j.kind === "changelog" && j.status === "ignored" && j.prNumber && (!lastRelease || j.createdAt > lastRelease))
@@ -67,7 +67,7 @@ function queuedEntry(j: Job): (QueuedEntry & { batch?: string }) | null {
  * What the next batched release will contain, per repo with queued PRs: the same grouping and skip rules the release comment uses.
  * Reads jobs only, so opening the dashboard never launches or bills anything.
  */
-export function releasePreviews(jobs: Job[], groupBots: (installationId: string, repo: string) => boolean, now: string = new Date().toISOString()): RepoReleasePreview[] {
+export function releasePreviews(jobs: Job[], groupBots: (installationId: string, repo: string) => boolean): RepoReleasePreview[] {
   const byRepo = new Map<string, { installationId: string; repo: string; items: { job: Job; e: QueuedEntry & { batch?: string } }[] }>();
   for (const job of jobs) {
     if (job.status !== "queued") continue;
@@ -90,7 +90,7 @@ export function releasePreviews(jobs: Job[], groupBots: (installationId: string,
         since: items[0].job.createdAt,
         bullets: rest.map((e) => ({ number: e.number, url: e.url, text: e.entry || e.title, section: e.section ?? null, breaking: !!e.breaking, explicit: !!e.entry, bot: !!e.bot })),
         botBullet: bullet, grouped,
-        skipped: skippedSince(jobs.filter((j) => j.installationId === installationId), repo, now),
+        skipped: skippedSince(jobs.filter((j) => j.installationId === installationId), repo), // no clock bound: the latest release wins
       };
     });
 }

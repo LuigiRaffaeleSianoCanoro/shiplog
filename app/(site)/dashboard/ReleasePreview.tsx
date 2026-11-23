@@ -35,7 +35,7 @@ export function ReleasePreview({ previews }: { previews: RepoReleasePreview[] })
                 <p><strong>Left out of the changelog, and why</strong></p>
                 <ul>
                   {p.grouped.length > 0 && <li>{p.grouped.length} bot PR{p.grouped.length === 1 ? "" : "s"} grouped into one bullet: {p.grouped.map((e) => `#${e.number}`).join(", ")}</li>}
-                  {p.skipped.map((s) => <li key={s.number}>#{s.number}: {s.reason}</li>)}
+                  {p.skipped.map((s, i) => <li key={`${s.number}-${i}`}>#{s.number}: {s.reason}</li>)}
                 </ul>
               </div>
             )}

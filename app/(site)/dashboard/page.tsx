@@ -12,6 +12,7 @@ import { releasePreviews } from "@/lib/release-preview";
 import { ReleasePreview } from "./ReleasePreview";
 
 export const dynamic = "force-dynamic";
+const PREVIEW_CONFIG_REPOS = 20;
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ installation_id?: string; token?: string }> }) {
   const { installation_id, token } = await searchParams;
@@ -27,11 +28,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const installs = scoped ? [await store.getInstallation(scoped)].filter(Boolean) as Awaited<ReturnType<typeof store.listInstallations>> : await store.listInstallations();
   const allJobs = await store.listJobs(scoped ?? undefined);
   const jobs = allJobs.slice(0, 20);
-  // group_bots lives in each repo's .shiplog.yml; read it only for repos with queued PRs, and fall back to no grouping.
-  const queuedRepos = [...new Set(allJobs.filter((j) => j.status === "queued").map((j) => `${j.installationId}\t${j.repo}`))];
+  // group_bots lives in each repo's .shiplog.yml. Read it only for queued repos (capped, 2 s each) so a slow VCS can't stall the page; fall back to no grouping.
+  const queuedRepos = [...new Set(allJobs.filter((j) => j.status === "queued").map((j) => `${j.installationId}\t${j.repo}`))].slice(0, PREVIEW_CONFIG_REPOS);
   const groupBots = new Map(await Promise.all(queuedRepos.map(async (k) => {
     const [inst, repo] = k.split("\t");
-    const cfg = await loadRepoConfig(inst, repo).catch(() => DEFAULT_CONFIG);
+    const cfg = await Promise.race([loadRepoConfig(inst, repo), new Promise<typeof DEFAULT_CONFIG>((r) => setTimeout(() => r(DEFAULT_CONFIG), 2000).unref?.())]).catch(() => DEFAULT_CONFIG);
     return [k, cfg.groupBots] as const;
   })));
   const previews = releasePreviews(allJobs, (inst, repo) => groupBots.get(`${inst}\t${repo}`) ?? false);
