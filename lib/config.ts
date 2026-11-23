@@ -1,4 +1,5 @@
 import { parse } from "yaml";
+import { isBotAuthor } from "./release-preview";
 import { classify, SECTIONS, type Section } from "./changelog";
 import type { OrphanMode, PackageDef } from "./packages";
 import { parseNoteAudiences, parseNoteLanguages, type NoteAudience, type NoteLanguage } from "./notes";
@@ -27,6 +28,10 @@ export interface ShiplogConfig {
   notify: { webhooks: string[] };
   /** Show the "Changelog by Shiplog" badge on the public changelog page (default on). */
   poweredBy: boolean;
+  /** Batch mode: fold bot PRs (Dependabot, Renovate, any app) into one "Dependency updates" bullet. */
+  groupBots: boolean;
+  /** Conventional-commit types left out of the changelog, e.g. chore, ci, test, build. */
+  skipTypes: string[];
 }
 export type BatchMode = "off" | "release" | "daily";
 export interface HistoryConfig {
@@ -45,6 +50,8 @@ export const DEFAULT_CONFIG: ShiplogConfig = {
   notes: { audiences: [], languages: ["en", "es"] },
   notify: { webhooks: [] },
   poweredBy: true,
+  groupBots: false,
+  skipTypes: [],
 };
 
 const str = (v: unknown, max = 80) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
@@ -103,6 +110,8 @@ export function parseConfig(text: string | null): ShiplogConfig {
     },
     notify: { webhooks: strList(raw.notify?.webhooks) ?? [] },
     poweredBy: raw.powered_by === false || raw.poweredBy === false ? false : DEFAULT_CONFIG.poweredBy,
+    groupBots: raw.group_bots === true || raw.groupBots === true,
+    skipTypes: (strList(raw.skip_types ?? raw.skipTypes) ?? []).map((t) => t.toLowerCase()).filter((t) => /^[a-z]+$/.test(t)),
   };
 }
 
@@ -125,9 +134,13 @@ export function excludedBy(pr: any, c: ShiplogConfig): string | null {
   const label = labelNames(pr).find((l) => wanted.includes(l.toLowerCase()));
   if (label) return `label ${label.toLowerCase()}`;
   const a = pr?.author ?? {};
-  const isBot = Boolean(a.app || a.serviceAccount || a.user?.performedVia?.app);
+  const isBot = isBotAuthor(a);
   const name: string = a.user?.handle ?? a.user?.slug ?? a.user?.username ?? a.app?.slug ?? a.app?.displayName ?? a.serviceAccount?.displayName ?? a.login ?? "";
-  if (!name && !isBot) return null;
-  if (c.exclude.authors.some((p) => (p.toLowerCase() === "bots" && isBot) || (name && glob(p, name)))) return `author ${name || "bot"}`;
+  if (name || isBot) {
+    if (c.exclude.authors.some((p) => (p.toLowerCase() === "bots" && isBot) || (name && glob(p, name)))) return `author ${name || "bot"}`;
+  }
+  const type = /^(\w+)(\([^)]*\))?!?:/.exec(String(pr?.title ?? "").trim())?.[1]?.toLowerCase();
+  // With group_bots in batch mode, bot PRs are grouped into one bullet instead of skipped by type (Dependabot titles are chore(deps)).
+  if (type && c.skipTypes.includes(type) && !(c.groupBots && c.batch !== "off" && isBot)) return `type ${type}`;
   return null;
 }
