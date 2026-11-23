@@ -15,7 +15,7 @@ import {
   repoPermission,
   vcsConfigured,
 } from "./vcs";
-import { groupBotEntries, isBotAuthor, leftOutBlock } from "./release-preview";
+import { groupBotEntries, isBotAuthor, leftOutBlock, skippedSince } from "./release-preview";
 import { DEFAULT_CONFIG, excludedBy, notesEnabled, sectionFor, type ShiplogConfig } from "./config";
 import { loadRepoConfig } from "./repo-config";
 import { allChangelogPaths, changelogTargets } from "./packages";
@@ -384,13 +384,8 @@ const batchOf = (j: Job): string => { try { return JSON.parse(j.result ?? "{}").
 
 /** PRs that will not get their own bullet in this release: grouped bots and changelog jobs skipped since the previous release. */
 async function leftOutSince(current: Job, cfg: ShiplogConfig, queued: QueuedEntry[]): Promise<string> {
-  const all = (await getStore().listJobs(current.installationId)).filter((j) => j.repo === current.repo && j.id !== current.id);
-  const lastRelease = all.filter((j) => j.kind === "release" && j.status !== "ignored" && j.status !== "failed" && j.createdAt <= current.createdAt)
-    .map((j) => j.createdAt).sort().pop();
-  const skipped = all
-    .filter((j) => j.kind === "changelog" && j.status === "ignored" && j.prNumber && (!lastRelease || j.createdAt > lastRelease))
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .map((j) => ({ number: j.prNumber, reason: (j.result ?? "").replace(/^excluded by /, "") }));
+  const others = (await getStore().listJobs(current.installationId)).filter((j) => j.id !== current.id);
+  const skipped = skippedSince(others, current.repo, current.createdAt);
   const grouped = cfg.groupBots ? groupBotEntries(queued).grouped : [];
   return leftOutBlock({ grouped, skipped });
 }

@@ -69,3 +69,12 @@ table { width:100%; border-collapse: collapse; font-size: .9rem; } td, th { text
   .mascot .loop { display:none; } .mascot .still { display:block; }
 }
 footer { padding: 40px 0 24px; color: var(--muted); font-size: .85rem; }
+/* Dashboard release preview (backlog 21) */
+.rp-repo { border-top: 1px solid var(--line); padding: 14px 0 4px; }
+.rp-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.rp-list { margin: 10px 0; padding-left: 0; list-style: none; }
+.rp-list li { padding: 6px 0; line-height: 1.5; }
+.rp-left { background: var(--bg); border-radius: 10px; padding: 10px 14px; margin: 6px 0 10px; font-size: .95rem; }
+.rp-left p { margin: 0 0 4px; }
+.rp-left ul { margin: 0; padding-left: 18px; }
+.rp-note { font-size: .85rem; margin-bottom: 0; }

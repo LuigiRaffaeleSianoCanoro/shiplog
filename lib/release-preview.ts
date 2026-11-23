@@ -1,4 +1,5 @@
 import type { QueuedEntry } from "./changelog";
+import type { Job } from "./store/types";
 
 /** Same bot test as `exclude.authors: [bots]`: an app, a service account, or an app acting through a user. */
 export function isBotAuthor(author: unknown): boolean {
@@ -33,4 +34,63 @@ export function leftOutBlock({ grouped, skipped }: { grouped: QueuedEntry[]; ski
   if (grouped.length) lines.push(`- ${grouped.length} bot PR${grouped.length === 1 ? "" : "s"} grouped into one bullet: ${grouped.map((e) => `#${e.number}`).join(", ")}`);
   for (const s of skipped) lines.push(`- #${s.number}: ${s.reason}`);
   return lines.join("\n");
+}
+
+/** Changelog jobs skipped (`ignored`) since the latest release at or before `at`, oldest first. */
+export function skippedSince(jobs: Job[], repo: string, at: string): SkippedPr[] {
+  const mine = jobs.filter((j) => j.repo === repo);
+  const lastRelease = mine.filter((j) => j.kind === "release" && j.status !== "ignored" && j.status !== "failed" && j.createdAt <= at)
+    .map((j) => j.createdAt).sort().pop();
+  return mine
+    .filter((j) => j.kind === "changelog" && j.status === "ignored" && j.prNumber && (!lastRelease || j.createdAt > lastRelease))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((j) => ({ number: j.prNumber, reason: (j.result ?? "").replace(/^excluded by /, "") }));
+}
+
+export interface PreviewBullet { number: string; url: string; text: string; section: string | null; breaking: boolean; /** Set by `/shiplog entry`, so it ships verbatim; otherwise the agent rewrites the PR title. */ explicit: boolean; bot: boolean }
+
+export interface RepoReleasePreview {
+  installationId: string; repo: string; batch: "release" | "daily";
+  /** When the oldest queued PR merged. */
+  since: string;
+  bullets: PreviewBullet[]; botBullet: string | null; grouped: QueuedEntry[]; skipped: SkippedPr[];
+}
+
+function queuedEntry(j: Job): (QueuedEntry & { batch?: string }) | null {
+  try {
+    const e = JSON.parse(j.result ?? "");
+    return e && typeof e === "object" && typeof e.title === "string" ? e : null;
+  } catch { return null; }
+}
+
+/**
+ * What the next batched release will contain, per repo with queued PRs: the same grouping and skip rules the release comment uses.
+ * Reads jobs only, so opening the dashboard never launches or bills anything.
+ */
+export function releasePreviews(jobs: Job[], groupBots: (installationId: string, repo: string) => boolean, now: string = new Date().toISOString()): RepoReleasePreview[] {
+  const byRepo = new Map<string, { installationId: string; repo: string; items: { job: Job; e: QueuedEntry & { batch?: string } }[] }>();
+  for (const job of jobs) {
+    if (job.status !== "queued") continue;
+    const e = queuedEntry(job);
+    if (!e) continue;
+    const k = `${job.installationId}\t${job.repo}`;
+    const g = byRepo.get(k) ?? { installationId: job.installationId, repo: job.repo, items: [] };
+    g.items.push({ job, e });
+    byRepo.set(k, g);
+  }
+  return [...byRepo.values()]
+    .sort((a, b) => a.installationId.localeCompare(b.installationId) || a.repo.localeCompare(b.repo))
+    .map(({ installationId, repo, items }) => {
+      items.sort((a, b) => a.job.createdAt.localeCompare(b.job.createdAt));
+      const entries = items.map((i) => i.e);
+      const { rest, grouped, bullet } = groupBots(installationId, repo) ? groupBotEntries(entries) : { rest: entries, grouped: [], bullet: null };
+      return {
+        installationId, repo,
+        batch: items.every((i) => i.e.batch === "daily") ? "daily" : "release",
+        since: items[0].job.createdAt,
+        bullets: rest.map((e) => ({ number: e.number, url: e.url, text: e.entry || e.title, section: e.section ?? null, breaking: !!e.breaking, explicit: !!e.entry, bot: !!e.bot })),
+        botBullet: bullet, grouped,
+        skipped: skippedSince(jobs.filter((j) => j.installationId === installationId), repo, now),
+      };
+    });
 }
