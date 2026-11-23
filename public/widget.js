@@ -7,7 +7,7 @@
   var feedUrl = script.getAttribute("data-feed");
   if (!feedUrl) return;
   var lang = script.getAttribute("data-lang") || ((navigator.language || "").slice(0, 2) === "es" ? "es" : "en");
-  var limit = parseInt(script.getAttribute("data-limit"), 10) || 8;
+  var limit = Math.max(1, parseInt(script.getAttribute("data-limit"), 10) || 8);
   var es = lang === "es";
   var T = es
     ? { btn: "Novedades", title: "Qu\u00e9 hay de nuevo", full: "Ver changelog completo", Added: "Nuevo", Changed: "Cambio", Fixed: "Arreglo", Security: "Seguridad", Deprecated: "Obsoleto", Removed: "Eliminado" }
@@ -73,7 +73,6 @@
     btn.type = "button";
     btn.setAttribute("data-testid", "shiplog-widget-button");
     btn.setAttribute("aria-expanded", "false");
-    btn.setAttribute("aria-controls", "slw-panel");
     var badge = null;
     if (unread) { badge = el("span", "badge", unread); badge.setAttribute("aria-label", unread + (es ? " sin leer" : " unread")); btn.appendChild(badge); }
 
@@ -98,7 +97,7 @@
     var full = el("a", null, T.full);
     full.href = page; full.target = "_blank"; full.rel = "noopener";
     var by = el("a", null, "Changelog by Shiplog");
-    by.href = "https://shiplog.help"; by.target = "_blank"; by.rel = "noopener"; by.title = "Shiplog para Cursor Origin";
+    by.href = "https://shiplog.help"; by.target = "_blank"; by.rel = "noopener"; by.title = es ? "Shiplog para Cursor Origin" : "Shiplog for Cursor Origin";
     foot.appendChild(full); foot.appendChild(by);
     panel.appendChild(foot);
 
@@ -117,6 +116,8 @@
 
     root.appendChild(panel);
     root.appendChild(btn);
-    document.body.appendChild(host);
+    // The feed can resolve before <body> exists when the tag has no defer.
+    if (document.body) document.body.appendChild(host);
+    else document.addEventListener("DOMContentLoaded", function () { document.body.appendChild(host); });
   }
 })();
