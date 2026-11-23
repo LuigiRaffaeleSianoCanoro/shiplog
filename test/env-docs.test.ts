@@ -8,7 +8,7 @@ const SELF_HOST = join(ROOT, "docs/self-host.md");
 const ENV_EXAMPLE = join(ROOT, ".env.example");
 
 /** Platform vars are read in code but set by Vercel or Next.js, not copied from .env.example. */
-const PLATFORM_VARS = new Set(["NODE_ENV", "VERCEL"]);
+const PLATFORM_VARS = new Set(["NODE_ENV", "VERCEL", "VERCEL_URL"]);
 
 function listTsFiles(dir: string): string[] {
   const out: string[] = [];

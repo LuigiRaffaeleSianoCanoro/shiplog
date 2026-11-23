@@ -110,6 +110,7 @@ After deploy, public changelog JSON is available at `/api/v1/changelogs/{namespa
 
 - `BLOB_READ_WRITE_TOKEN`, `BLOB_STORE_ID` — injected when a Blob store is linked to the project.
 - `VERCEL` — set on Vercel; without Blob or Supabase the app refuses to start in production.
+- `VERCEL_URL` — deployment hostname (previews); used only when `SHIPLOG_INSTALL_ORIGIN` is unset for canonical feed URLs.
 - `NODE_ENV` — set by Next.js (`production` on Vercel).
 
 ## 4. Install Shiplog in your namespace
