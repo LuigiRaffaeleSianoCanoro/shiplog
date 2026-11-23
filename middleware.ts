@@ -10,5 +10,8 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|ico|webp)$).*)"],
+  /** Only two-segment public paths (changelog slugs); skips /, /dashboard, /api, static assets. */
+  matcher: [
+    "/((?!api|_next|ingest|dashboard|setup|privacy|brand|favicon.ico|.*\\.(?:svg|png|ico|webp)$)[^/]+/[^/]+.*)",
+  ],
 };

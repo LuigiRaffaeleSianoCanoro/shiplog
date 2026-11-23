@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { del, get, list, put } from "@vercel/blob";
+import { BlobAccessError, BlobNotFoundError, BlobStoreNotFoundError, BlobStoreSuspendedError, del, get, head, list, put } from "@vercel/blob";
+import { StoreAuthError } from "./store-auth-error";
 import { pickNewestActiveInstallation } from "../installation-namespace";
 import type { Installation, Job, Outbox, Store, UserKey } from "./types";
 
@@ -19,15 +20,69 @@ function changelogKeyFromPathname(pathname: string): string | null {
 }
 const opts = { access: "private" as const, contentType: "application/json", addRandomSuffix: false, cacheControlMaxAge: 60 };
 
+function isBlobGet403(err: unknown): boolean {
+  return err instanceof Error && /Failed to fetch blob:\s*403\b/i.test(err.message);
+}
+
+/** head() reports token or store problems as typed errors instead of a 403 message. */
+function isBlobAuthFailure(err: unknown): boolean {
+  return err instanceof BlobAccessError || err instanceof BlobStoreNotFoundError || err instanceof BlobStoreSuspendedError;
+}
+
+function pathnamePrefix(pathname: string): string {
+  const slash = pathname.lastIndexOf("/");
+  return slash >= 0 ? `${pathname.slice(0, slash + 1)}` : pathname;
+}
+
+function logBlobForbidden(pathname: string, kind: "missing" | "auth") {
+  console.log(JSON.stringify({ event: "blob_read_forbidden", pathnamePrefix: pathnamePrefix(pathname), kind }));
+}
+
 async function readJson<T>(pathname: string): Promise<T | null> {
-  const r = await get(pathname, { access: "private", useCache: false });
+  let r: Awaited<ReturnType<typeof get>>;
+  try {
+    r = await get(pathname, { access: "private", useCache: false });
+  } catch (err) {
+    if (isBlobAuthFailure(err)) {
+      logBlobForbidden(pathname, "auth");
+      throw new StoreAuthError(pathnamePrefix(pathname));
+    }
+    if (!isBlobGet403(err)) throw err;
+    try {
+      await head(pathname);
+      logBlobForbidden(pathname, "auth");
+      throw new StoreAuthError(pathnamePrefix(pathname));
+    } catch (headErr) {
+      if (headErr instanceof StoreAuthError) throw headErr;
+      if (headErr instanceof BlobNotFoundError) {
+        logBlobForbidden(pathname, "missing");
+        return null;
+      }
+      if (isBlobGet403(headErr) || isBlobAuthFailure(headErr)) {
+        logBlobForbidden(pathname, "auth");
+        throw new StoreAuthError(pathnamePrefix(pathname));
+      }
+      throw headErr;
+    }
+  }
   if (!r || !r.stream) return null;
   return JSON.parse(await new Response(r.stream as ReadableStream).text()) as T;
 }
 const write = (pathname: string, data: unknown) => put(pathname, JSON.stringify(data), { ...opts, allowOverwrite: true });
 
+/** list() for reads: token or store failures become StoreAuthError so routes can answer 503. */
+async function listForRead(prefix: string) {
+  try {
+    return await list({ prefix, limit: 1000 });
+  } catch (err) {
+    if (!isBlobAuthFailure(err)) throw err;
+    logBlobForbidden(prefix, "auth");
+    throw new StoreAuthError(pathnamePrefix(prefix));
+  }
+}
+
 async function readAll<T>(prefix: string, limit = 100): Promise<T[]> {
-  const { blobs } = await list({ prefix, limit: 1000 });
+  const { blobs } = await listForRead(prefix);
   const newest = blobs.sort((a, b) => a.pathname.localeCompare(b.pathname)).slice(0, limit); // rev() prefix: ascending = newest first
   return (await Promise.all(newest.map((b) => readJson<T>(b.pathname)))).filter(Boolean) as T[];
 }
@@ -112,7 +167,7 @@ export class BlobStore implements Store {
   async getChangelog(repo: string) { return (await readJson<{ markdown: string }>(`${P}/changelogs/${enc(repo)}.json`))?.markdown ?? null; }
   async putChangelog(repo: string, md: string) { await write(`${P}/changelogs/${enc(repo)}.json`, { markdown: md, updatedAt: new Date().toISOString() }); }
   async listChangelogKeysForRepo(repoSlug: string) {
-    const { blobs } = await list({ prefix: `${P}/changelogs/`, limit: 1000 });
+    const { blobs } = await listForRead(`${P}/changelogs/`);
     const keys: string[] = [];
     for (const b of blobs) {
       const key = changelogKeyFromPathname(b.pathname);
