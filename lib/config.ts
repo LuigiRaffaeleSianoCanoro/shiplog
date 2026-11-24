@@ -32,6 +32,8 @@ export interface ShiplogConfig {
   groupBots: boolean;
   /** Conventional-commit types left out of the changelog, e.g. chore, ci, test, build. */
   skipTypes: string[];
+  /** Public page and feeds read the changelog file from the default branch, with a store fallback. */
+  syncFromGit: boolean;
 }
 export type BatchMode = "off" | "release" | "daily";
 export interface HistoryConfig {
@@ -52,6 +54,7 @@ export const DEFAULT_CONFIG: ShiplogConfig = {
   poweredBy: true,
   groupBots: false,
   skipTypes: [],
+  syncFromGit: false,
 };
 
 const str = (v: unknown, max = 80) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
@@ -112,6 +115,7 @@ export function parseConfig(text: string | null): ShiplogConfig {
     poweredBy: raw.powered_by === false || raw.poweredBy === false ? false : DEFAULT_CONFIG.poweredBy,
     groupBots: raw.group_bots === true || raw.groupBots === true,
     skipTypes: (strList(raw.skip_types ?? raw.skipTypes) ?? []).map((t) => t.toLowerCase()).filter((t) => /^[a-z]+$/.test(t)),
+    syncFromGit: raw.sync_from_git === true || raw.syncFromGit === true,
   };
 }
 

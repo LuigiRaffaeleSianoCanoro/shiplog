@@ -52,9 +52,12 @@ orphan: root         # when packages is set: root = unmatched files use `changel
 powered_by: true     # show "Changelog by Shiplog" on the public page at /{namespace}/{repo} (default on; set false to hide)
 group_bots: false    # batch mode: fold bot PRs (Dependabot, Renovate, any app) into one "Dependency updates" bullet
 skip_types: []       # conventional types left out, e.g. [chore, ci, test, build]; an installer's /shiplog entry brings a PR back
+sync_from_git: false # public page and feeds read the changelog file from the default branch (default off; store is the fallback)
 ```
 
 Public changelog pages show a small **Changelog by Shiplog** badge by default. Disable it per repo with `powered_by: false` in `.shiplog.yml`.
+
+Agent and prompt modes write `CHANGELOG.md` in git, while the public page normally reads the Blob store, so the page can lag. Set `sync_from_git: true` to read the configured changelog path from the default branch instead. The store is used when that read fails, times out after 2 seconds, or the file is missing. The HTML page and RSS/JSON feeds share this path. The v1 API and MCP still read the store. Cached public pages may stay stale for up to 5 minutes (ISR).
 
 ## Sponsors
 
