@@ -6,8 +6,13 @@ import { COOKIE, readSession } from "@/lib/session";
 import { safeEqual } from "@/lib/crypto";
 import { GITHUB_SPONSORS_URL } from "@/lib/sponsors";
 import { vcsDeliveryLabel } from "@/lib/vcs";
+import { DEFAULT_CONFIG } from "@/lib/config";
+import { loadRepoConfig } from "@/lib/repo-config";
+import { releasePreviews } from "@/lib/release-preview";
+import { ReleasePreview } from "./ReleasePreview";
 
 export const dynamic = "force-dynamic";
+const PREVIEW_CONFIG_REPOS = 20;
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ installation_id?: string; token?: string }> }) {
   const { installation_id, token } = await searchParams;
@@ -21,7 +26,16 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   }
   await pollAgents().catch(() => 0); // Hobby cron is daily; also poll on view (after auth).
   const installs = scoped ? [await store.getInstallation(scoped)].filter(Boolean) as Awaited<ReturnType<typeof store.listInstallations>> : await store.listInstallations();
-  const jobs = (await store.listJobs(scoped ?? undefined)).slice(0, 20);
+  const allJobs = await store.listJobs(scoped ?? undefined);
+  const jobs = allJobs.slice(0, 20);
+  // group_bots lives in each repo's .shiplog.yml. Read it only for queued repos (capped, 2 s each) so a slow VCS can't stall the page; fall back to no grouping.
+  const queuedRepos = [...new Set(allJobs.filter((j) => j.status === "queued").map((j) => `${j.installationId}\t${j.repo}`))].slice(0, PREVIEW_CONFIG_REPOS);
+  const groupBots = new Map(await Promise.all(queuedRepos.map(async (k) => {
+    const [inst, repo] = k.split("\t");
+    const cfg = await Promise.race([loadRepoConfig(inst, repo), new Promise<typeof DEFAULT_CONFIG>((r) => setTimeout(() => r(DEFAULT_CONFIG), 2000).unref?.())]).catch(() => DEFAULT_CONFIG);
+    return [k, cfg.groupBots] as const;
+  })));
+  const previews = releasePreviews(allJobs, (inst, repo) => groupBots.get(`${inst}\t${repo}`) ?? false);
   const outbox = (await store.listOutbox(scoped ?? undefined)).slice(0, 5);
   return (
     <main className="wrap page" style={{ maxWidth: 1040 }}>
@@ -42,6 +56,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           {!installs.length && <tr><td colSpan={6} className="muted">No installations yet. <a href="/setup">Install on Origin or GitHub</a>.</td></tr>}
         </tbody></table></div>
       </div>
+      <ReleasePreview previews={previews} />
       <div className="panel fade-up d2">
         <h3>Recent jobs</h3>
         <div className="table-scroll"><table><thead><tr><th>When (UTC)</th><th>Repo</th><th>PR</th><th>Kind</th><th>Mode</th><th>Status</th></tr></thead><tbody>
