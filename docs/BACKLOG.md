@@ -26,7 +26,7 @@ Size: S is under a day, M is 2 to 4 days, L is a week or more. **UI** means the 
 ## Next
 
 7. **Public changelog HTML should return 503 when the store is down.** The unavailable view renders with HTTP 200, which monitors and caches read as healthy. Evidence: `app/(changelog)/[namespace]/[repo]/page.tsx`. Size M. **UI.** In review as #81: it answers a `no-store` 500 with a retry, because a Next page can't set 503.
-8. **Optional live sync from the repo's `CHANGELOG.md`.** Agent and prompt modes write the changelog in git, but the public page reads only the Blob store, so it can lag. Evidence: `lib/public-changelog.ts`. In review: `sync_from_git` in `.shiplog.yml`, a contents read with a store fallback on the public page and feeds. API and MCP stay on the store.
+8. **Optional live sync from the repo's `CHANGELOG.md`.** Agent and prompt modes write the changelog in git, but public readers used to lag on the Blob store. Evidence: `lib/public-changelog.ts`, `lib/changelog-read.ts`. Public page and feeds in #85. API and MCP: this slice, in review.
 10. **Dashboard control for a manual batch flush.** Builds on 9. Size M. **UI.**
 21. **Release preview view in the dashboard.** Show the batch draft beside the left-out list from #77. Size M. **UI.**
 

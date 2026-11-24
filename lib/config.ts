@@ -59,7 +59,12 @@ export const DEFAULT_CONFIG: ShiplogConfig = {
 
 const str = (v: unknown, max = 80) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
 const strList = (v: unknown) => (Array.isArray(v) ? v.map((x) => str(x)).filter((x): x is string => !!x) : null);
-const safePath = (v: unknown) => { const p = str(v, 200); return p && /^[\w./-]+\.md$/i.test(p) && !p.split("/").includes("..") && !p.startsWith("/") ? p : null; };
+/** Relative `*.md` path with no `..` or leading slash. Used for yml `changelog` and for git reads of API/MCP path overrides. */
+export function safeChangelogPath(v: unknown): string | null {
+  const p = str(v, 200);
+  return p && /^[\w./-]+\.md$/i.test(p) && !p.split("/").includes("..") && !p.startsWith("/") ? p : null;
+}
+const safePath = safeChangelogPath;
 const safeGlob = (v: unknown) => {
   const p = str(v, 200);
   return p && !p.startsWith("/") && !p.includes("..") ? p.replace(/\\/g, "/") : null;
