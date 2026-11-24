@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { EMPTY, SECTIONS, type Section } from "./changelog";
+import { readChangelogMarkdown } from "./changelog-sync";
 import { loadRepoConfig } from "./repo-config";
 import type { Store } from "./store";
 import { isStoreAuthError } from "./store/store-auth-error";
@@ -152,8 +153,14 @@ async function resolvePublicChangelogUncached(namespace: string, repo: string, s
   if (!repoSlug) return null;
   const active = await store.getActiveInstallationByNamespace(namespace);
   if (!active) return null;
-  const markdown = (await store.getChangelog(repoSlug)) ?? EMPTY;
   const cfg = await loadRepoConfig(active.id, repoSlug);
+  const markdown = await readChangelogMarkdown({
+    store,
+    installationId: active.id,
+    repoSlug,
+    changelogPath: cfg.changelogPath,
+    syncFromGit: cfg.syncFromGit,
+  });
   return {
     repoSlug,
     namespace,

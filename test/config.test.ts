@@ -116,3 +116,14 @@ describe("powered_by badge", () => {
     expect(parseConfig("powered_by: nope").poweredBy).toBe(true);
   });
 });
+
+describe("sync_from_git", () => {
+  it("defaults off and only turns on for an explicit true", () => {
+    expect(DEFAULT_CONFIG.syncFromGit).toBe(false);
+    expect(parseConfig(null).syncFromGit).toBe(false);
+    expect(parseConfig("sync_from_git: true").syncFromGit).toBe(true);
+    expect(parseConfig("syncFromGit: true").syncFromGit).toBe(true);
+    expect(parseConfig("sync_from_git: false").syncFromGit).toBe(false);
+    expect(parseConfig("sync_from_git: yes").syncFromGit).toBe(false);
+  });
+});
