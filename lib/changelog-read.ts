@@ -9,7 +9,7 @@ import {
   type ChangelogDocument,
   type JsonFeed,
 } from "./public-changelog";
-import { safeChangelogPath } from "./config";
+import { DEFAULT_CONFIG, safeChangelogPath } from "./config";
 import { readChangelogMarkdown } from "./changelog-sync";
 import { loadRepoConfig } from "./repo-config";
 import type { Store } from "./store";
@@ -77,7 +77,7 @@ async function resolveReadableChangelogUncached(
   if (!repoSlug) return null;
   const active = await store.getActiveInstallationByNamespace(namespace);
   if (!active) return null;
-  const cfg = await loadRepoConfig(active.id, repoSlug);
+  const cfg = await loadRepoConfig(active.id, repoSlug).catch(() => DEFAULT_CONFIG);
   const requested = changelogPath?.trim() ? normalizeChangelogPath(changelogPath) : null;
   const resolvedPath = requested ?? (cfg.syncFromGit ? cfg.changelogPath : "CHANGELOG.md");
   let storageKey = storageKeyForChangelogPath(repoSlug, resolvedPath === "CHANGELOG.md" ? null : resolvedPath);

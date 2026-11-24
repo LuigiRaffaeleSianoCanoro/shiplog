@@ -40,6 +40,17 @@ describe("resolveReadableChangelog with sync_from_git", () => {
     expect(git).not.toHaveBeenCalled();
   });
 
+  it("serves the store when loadRepoConfig rejects", async () => {
+    const store = await seededStore();
+    const repoConfig = await import("@/lib/repo-config");
+    const vcs = await import("@/lib/vcs");
+    vi.spyOn(repoConfig, "loadRepoConfig").mockRejectedValue(new Error("origin 500"));
+    const git = vi.spyOn(vcs, "getRepoFile").mockResolvedValue(GIT_MD);
+    const r = await resolveReadableChangelog("acme", "demo", store);
+    expect(r?.markdown).toContain("from store");
+    expect(git).not.toHaveBeenCalled();
+  });
+
   it("uses the git file on the API resolver when the flag is on", async () => {
     const store = await seededStore();
     const vcs = await withFlag(true);
