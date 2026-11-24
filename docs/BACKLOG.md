@@ -1,6 +1,6 @@
 # Shiplog engineering backlog
 
-Evidence-based priorities for `main`, refreshed 2026-11-23. It replaces the draft in PR #61 and keeps its numbering, so older PRs that cite "backlog N" still resolve. Each row names the problem, the evidence, and the PR that closed it or the fix still open. Issues #33 to #40 are reserved for community contributors and listed at the end.
+Evidence-based priorities for `main`, refreshed 2026-11-24. It replaces the draft in PR #61 and keeps its numbering, so older PRs that cite "backlog N" still resolve. Each row names the problem, the evidence, and the PR that closed it or the fix still open. Issues #33 to #40 are reserved for community contributors and listed at the end.
 
 Size: S is under a day, M is 2 to 4 days, L is a week or more. **UI** means the change needs image proposals and a visual OK before it merges.
 
@@ -22,11 +22,11 @@ Size: S is under a day, M is 2 to 4 days, L is a week or more. **UI** means the 
 20. **In-app "What's new" widget (roadmap 15).** `public/widget.js` in #73, with CORS on `feed.json` in #72.
 22. **GitHub exclude rules.** GitHub PR webhooks dropped labels and the author, so `exclude.labels`, `exclude.authors` and `no-changelog` never matched on GitHub repos. Fixed in #76.
 23. **Group bot PRs and explain skips (competitor proposal 2).** `group_bots` and `skip_types` in `.shiplog.yml`, and a "Left out of the changelog, and why" block on batched release comments. Added in #77.
+8. **Optional live sync from the repo's `CHANGELOG.md`.** Agent and prompt modes write the changelog in git, but public readers used to lag on the Blob store. Fixed in #85 (public page and feeds) and #86 (v1 API and MCP): opt-in `sync_from_git` in `.shiplog.yml`, a 2s git read, and a store fallback to the `repoSlug` key.
 
 ## Next
 
 7. **Public changelog HTML should return 503 when the store is down.** The unavailable view renders with HTTP 200, which monitors and caches read as healthy. Evidence: `app/(changelog)/[namespace]/[repo]/page.tsx`. Size M. **UI.** In review as #81: it answers a `no-store` 500 with a retry, because a Next page can't set 503.
-8. **Optional live sync from the repo's `CHANGELOG.md`.** Agent and prompt modes write the changelog in git, but public readers used to lag on the Blob store. Evidence: `lib/public-changelog.ts`, `lib/changelog-read.ts`. Public page and feeds in #85. API and MCP: this slice, in review.
 10. **Dashboard control for a manual batch flush.** Builds on 9. Size M. **UI.**
 21. **Release preview view in the dashboard.** Show the batch draft beside the left-out list from #77. Size M. **UI.**
 
