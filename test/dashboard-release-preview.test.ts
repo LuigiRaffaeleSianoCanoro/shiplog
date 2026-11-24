@@ -85,7 +85,7 @@ describe("dashboard release preview (backlog 21)", () => {
 describe("dashboard page renders the release preview", () => {
   afterEach(() => { vi.unstubAllEnvs(); vi.doUnmock("next/headers"); vi.doUnmock("@/lib/repo-config"); vi.restoreAllMocks(); });
 
-  async function render(params: { token?: string; installation_id?: string }, session?: string, groupBotsRepos: string[] = []) {
+  async function render(params: Record<string, string>, session?: string, groupBotsRepos: string[] = [], opts: { key?: boolean; queue?: boolean } = {}) {
     vi.resetModules();
     vi.stubEnv("SHIPLOG_DASHBOARD_TOKEN", "op-token-123");
     vi.stubEnv("SHIPLOG_KEY_ENC", "a".repeat(64)); // session cookie HMAC, test-only
@@ -103,7 +103,8 @@ describe("dashboard page renders the release preview", () => {
     const store = new MemoryStore();
     await store.upsertInstallation({ id: "i1", namespace: "acme", status: "active", createdAt: "2026-01-01" } as never);
     await store.upsertInstallation({ id: "i2", namespace: "other", status: "active", createdAt: "2026-01-01" } as never);
-    for (const j of jobs) await store.putJob(j);
+    if (opts.key) await store.putKey({ installationId: "i1", last4: "mnop", kind: "personal", createdAt: "" } as never);
+    for (const j of opts.queue === false ? jobs.filter((j) => j.status !== "queued") : jobs) await store.putJob(j);
     await store.putJob({ ...queued("50", "feat: secret other-tenant work", "2026-11-09T00:00:00Z", {}, "other/app"), installationId: "i2" });
     setStore(store);
     const { default: Dashboard } = await import("@/app/(site)/dashboard/page");
@@ -142,6 +143,59 @@ describe("dashboard page renders the release preview", () => {
     const { panel } = await render({ installation_id: "i1" }, "i1");
     expect(panel).toContain("acme/web");
     expect(panel).not.toContain("other-tenant");
+  });
+
+  it("install session with a key: a Run batch now form per repo, posting that repo, with the run count and key", async () => {
+    const { panel } = await render({ installation_id: "i1" }, "i1", [], { key: true });
+    const forms = panel.match(/<form action="\/api\/batch\/flush" method="post">[\s\S]*?<\/form>/g) ?? [];
+    expect(forms).toHaveLength(2); // acme/api and acme/web
+    const web = forms.find((f) => f.includes('value="acme/web"'))!;
+    expect(web).toContain('name="installationId" value="i1"');
+    expect(web.replace(/<!-- -->/g, "")).toContain("Starts 1 agent run on your Cursor key (•••• mnop) to add these 4 PRs");
+    expect(web.replace(/<!-- -->/g, "")).toContain(">Start 1 agent run</button>");
+  });
+
+  it("a monorepo repo promises one run per changelog file in the form", async () => {
+    const { ReleasePreview } = await import("@/app/(site)/dashboard/ReleasePreview");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const mono = [queued("1", "feat: a", "2026-11-02T00:00:00Z", { changelogPaths: ["packages/a/CHANGELOG.md", "packages/b/CHANGELOG.md"] })];
+    const html = renderToStaticMarkup(createElement(ReleasePreview, { previews: releasePreviews(mono, () => false), flushAccess: () => ({ kind: "ready" as const, keyLast4: "1234" }) })).replace(/<!-- -->/g, "");
+    expect(html).toContain("Starts 2 agent runs on your Cursor key");
+    expect(html).toContain(", one per changelog file");
+    expect(html).toContain(">Start 2 agent runs</button>");
+  });
+
+  it("the operator overview never offers the flush (it would spend someone else's key)", async () => {
+    const { panel } = await render({ token: "op-token-123" }, undefined, [], { key: true });
+    expect(panel).not.toContain("/api/batch/flush");
+    expect(panel).not.toContain("Add a Cursor key");
+  });
+
+  it("install session without a key: no form, a hint instead", async () => {
+    const { panel } = await render({ installation_id: "i1" }, "i1");
+    expect(panel).not.toContain("<form");
+    expect(panel).toContain("Add a Cursor key on the setup page to run this batch now");
+  });
+
+  it("after a flush the result shows even when the queue is now empty; a failure says the PRs are still queued", async () => {
+    const ok = await render({ installation_id: "i1", flush: "launched", repo: "acme/web", prs: "4", runs: "1" }, "i1", [], { key: true, queue: false });
+    expect(ok.panel.replace(/<!-- -->/g, "")).toContain("Started 1 agent run for 4 queued PRs in acme/web. A changelog PR will follow.");
+    const bad = await render({ installation_id: "i1", flush: "failed", repo: "acme/web" }, "i1", [], { key: true });
+    expect(bad.panel.replace(/<!-- -->/g, "")).toContain("The PRs are still queued");
+    const busy = await render({ installation_id: "i1", flush: "busy", repo: "acme/web" }, "i1", [], { key: true });
+    expect(busy.panel.replace(/<!-- -->/g, "")).toContain("Another run is already starting for acme/web");
+    const partial = await render({ installation_id: "i1", flush: "launched", repo: "acme/web", prs: "1", runs: "1", failed: "1" }, "i1", [], { key: true });
+    expect(partial.panel.replace(/<!-- -->/g, "")).toContain("1 changelog file failed to start");
+    const forged = await render({ installation_id: "i1", flush: "launched", repo: "<script>" }, undefined);
+    expect(forged.html).not.toContain("Started");
+    const operator = await render({ token: "op-token-123", installation_id: "i1", flush: "launched", repo: "acme/web", prs: "1", runs: "1" });
+    expect(operator.html).not.toContain("Started 1 agent run");
+    const otherSession = await render({ installation_id: "i1", flush: "launched", repo: "acme/web", prs: "1", runs: "1" }, "i2");
+    expect(otherSession.html).not.toContain("Started 1 agent run");
+    const escaped = await render({ installation_id: "i1", flush: "empty", repo: "<img src=x onerror=alert(1)>" }, "i1", [], { key: true });
+    expect(escaped.panel).not.toContain("<img src=x");
+    expect(escaped.panel).toContain("&lt;img");
   });
 
   it("no auth, no preview", async () => {

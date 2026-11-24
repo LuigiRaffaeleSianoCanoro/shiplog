@@ -379,7 +379,7 @@ export async function handleEvent(env_: Envelope, deliveryId: string): Promise<J
   return job;
 }
 
-const entryOf = (j: Job): QueuedEntry => JSON.parse(j.result ?? "{}");
+const entryOf = (j: Job): QueuedEntry => { try { return JSON.parse(j.result ?? "{}"); } catch { return {} as QueuedEntry; } };
 const batchOf = (j: Job): string => { try { return JSON.parse(j.result ?? "{}").batch ?? ""; } catch { return ""; } };
 
 /** PRs that will not get their own bullet in this release: grouped bots and changelog jobs skipped since the previous release. */
@@ -397,11 +397,12 @@ async function markBatched(queued: Job[], batchJobId: string) {
   for (const j of queued) { j.status = "done"; j.result = `batched into ${batchJobId}`; await getStore().putJob(j); }
 }
 
-/** Daily batches (cron): one agent per repo and changelog file for PRs queued with `batch: daily`. Returns agents launched. */
-export async function flushBatches(): Promise<number> {
-  const store = getStore();
-  const groups = new Map<string, { installationId: string; repo: string; path: string; jobs: Job[] }>();
-  for (const j of (await store.listJobs()).filter((j) => j.status === "queued" && batchOf(j) === "daily").reverse()) {
+type BatchGroup = { installationId: string; repo: string; path: string; jobs: Job[] };
+
+/** Queued jobs grouped per installation, repo and changelog file (a PR can span several package changelogs). Oldest first. */
+function groupByChangelog(queued: Job[]): BatchGroup[] {
+  const groups = new Map<string, BatchGroup>();
+  for (const j of [...queued].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
     const e = entryOf(j);
     const paths = e.changelogPaths?.length ? e.changelogPaths : ["__default__"];
     for (const path of paths) {
@@ -411,12 +412,25 @@ export async function flushBatches(): Promise<number> {
       else groups.set(k, { installationId: j.installationId, repo: j.repo, path, jobs: [j] });
     }
   }
-  let launched = 0;
-  const flushed = new Set<string>(); // jobs batched by this run (a PR can span several package changelogs)
-  for (const { installationId, repo, path, jobs: grp } of groups.values()) {
+  return [...groups.values()];
+}
+
+/**
+ * One agent per group, adding the queued PRs under [Unreleased] (no version cut). Callers hold the cron poll lock, so the
+ * daily cron and a dashboard click never run this at the same time. Each group re-reads its jobs first.
+ * A PR in several changelog files stays queued, with the files still to do, until every file's run has launched;
+ * a failed launch leaves exactly the failed files queued for the next try.
+ */
+async function launchBatches(groups: BatchGroup[], stillQueued: (j: Job) => boolean, deadline = Infinity): Promise<{ launched: number; prs: number; failed: number }> {
+  const store = getStore();
+  let launched = 0, failed = 0;
+  const done = new Set<string>();
+  for (const { installationId, repo, path, jobs: grp } of groups) {
+    // Past the deadline the lock may have expired: leave the rest queued (reported as failed) rather than race another holder.
+    if (Date.now() > deadline) { failed++; continue; }
     const ids = new Set(grp.map((j) => j.id));
-    // Re-read so an overlapping poll that already batched these jobs is not repeated.
-    const live = (await store.listJobs()).filter((j) => ids.has(j.id) && (flushed.has(j.id) || (j.status === "queued" && batchOf(j) === "daily")));
+    const live = (await store.listJobs()).filter((j) => ids.has(j.id) && j.status === "queued" && stillQueued(j))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     if (!live.length) continue;
     try {
       const key = await userKey(installationId);
@@ -427,12 +441,67 @@ export async function flushBatches(): Promise<number> {
       const l = await launchAgent(key, batchPrompt(repo, entries, styleOf(cfg, changelogPath), undefined, undefined, changelogPath, { groupBots: cfg.groupBots }), repoUrl(repo));
       const job: Job = { id: randomUUID(), deliveryId: `batch-${randomUUID()}`, installationId, repo, prNumber: "", prUrl: repoUrl(repo), kind: "changelog", mode: "cursor", status: "running", agentId: l.agentId, runId: l.runId, changelogPaths: [changelogPath], result: `agent ${l.agentId} (${entries.length} queued PRs)`, createdAt: new Date().toISOString() };
       await store.putJob(job);
-      for (const j of live) flushed.add(j.id);
-      await markBatched(live, job.id);
+      const finished: Job[] = [];
+      for (const j of live) {
+        const e = entryOf(j);
+        const rest = (e.changelogPaths ?? []).filter((p) => p !== path);
+        if (path !== "__default__" && rest.length) { j.result = JSON.stringify({ ...e, changelogPaths: rest }); await store.putJob(j); }
+        else finished.push(j);
+      }
+      await markBatched(finished, job.id);
+      for (const j of live) done.add(j.id);
       launched++;
-    } catch (e) { console.error("[shiplog] batch flush failed:", (e as Error).message); }
+    } catch (e) {
+      failed++;
+      console.error("[shiplog] batch flush failed:", (e as Error).message);
+    }
   }
-  return launched;
+  return { launched, prs: done.size, failed };
+}
+
+/** Daily batches (cron): one agent per repo and changelog file for PRs queued with `batch: daily`. Returns agents launched. */
+export async function flushBatches(): Promise<number> {
+  const daily = (await getStore().listJobs()).filter((j) => j.status === "queued" && batchOf(j) === "daily");
+  return (await launchBatches(groupByChangelog(daily), (j) => batchOf(j) === "daily")).launched;
+}
+
+export type FlushResult =
+  | { status: "launched"; agentRuns: number; prs: number; /** Changelog files whose run failed to start; their PRs stay queued for them. */ failedRuns: number }
+  | { status: "empty" } | { status: "no_key" } | { status: "busy" } | { status: "failed" };
+
+/** How long a manual flush may hold the cron poll lock before it counts as abandoned. */
+const FLUSH_LOCK_TTL_MS = 120_000;
+const FLUSH_LOCK_MARGIN_MS = 30_000;
+
+/** Queued for a batch with a readable entry. Records from before `batch` was stored count as release batches. */
+function isBatchQueued(j: Job): boolean {
+  if (j.status !== "queued") return false;
+  const b = batchOf(j);
+  return (b === "" || b === "release" || b === "daily") && typeof entryOf(j).title === "string";
+}
+
+/**
+ * Dashboard "Run batch now": every queued PR of one repo (release or daily batch) goes into one agent run per changelog file,
+ * billed to the installation's Cursor key. Adds them under [Unreleased]; cutting a version stays `/shiplog release`.
+ */
+export async function flushRepoNow(installationId: string, repo: string): Promise<FlushResult> {
+  const store = getStore();
+  const queuedNow = async () => (await store.listJobs(installationId)).filter((j) => j.repo === repo && isBatchQueued(j));
+  if (!(await queuedNow()).length) return { status: "empty" };
+  if (!(await userKey(installationId))) return { status: "no_key" };
+  // Same lock as the cron poll: a click during the cron, or two clicks at once, wait instead of launching twice. The TTL frees it after a crash.
+  if (!(await store.acquireCronPollLock(FLUSH_LOCK_TTL_MS))) return { status: "busy" };
+  // Stop starting runs well before the lease expires, and don't release a lease that may now belong to someone else.
+  const deadline = Date.now() + FLUSH_LOCK_TTL_MS - FLUSH_LOCK_MARGIN_MS;
+  try {
+    const queued = await queuedNow();
+    if (!queued.length) return { status: "empty" };
+    const { launched, prs, failed } = await launchBatches(groupByChangelog(queued), isBatchQueued, deadline);
+    if (launched) return { status: "launched", agentRuns: launched, prs, failedRuns: failed };
+    return failed ? { status: "failed" } : { status: "empty" };
+  } finally {
+    if (Date.now() <= deadline + FLUSH_LOCK_MARGIN_MS / 2) await store.releaseCronPollLock();
+  }
 }
 
 /** Days a queued PR may wait before recovery. SHIPLOG_QUEUE_STALE_DAYS, default 14; 0 turns recovery off. */

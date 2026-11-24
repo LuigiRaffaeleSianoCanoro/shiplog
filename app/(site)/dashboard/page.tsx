@@ -9,13 +9,13 @@ import { vcsDeliveryLabel } from "@/lib/vcs";
 import { DEFAULT_CONFIG } from "@/lib/config";
 import { loadRepoConfig } from "@/lib/repo-config";
 import { releasePreviews } from "@/lib/release-preview";
-import { ReleasePreview } from "./ReleasePreview";
+import { ReleasePreview, type FlushAccess } from "./ReleasePreview";
 
 export const dynamic = "force-dynamic";
 const PREVIEW_CONFIG_REPOS = 20;
 
-export default async function Dashboard({ searchParams }: { searchParams: Promise<{ installation_id?: string; token?: string }> }) {
-  const { installation_id, token } = await searchParams;
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ installation_id?: string; token?: string; flush?: string; repo?: string; prs?: string; runs?: string; failed?: string }> }) {
+  const { installation_id, token, flush, repo: flushRepo, prs, runs, failed } = await searchParams;
   const store = getStore();
   // Scoped view needs the install session for that installation; the overview needs the operator token.
   const scoped = installation_id ?? null;
@@ -35,6 +35,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     const cfg = await Promise.race([loadRepoConfig(inst, repo), new Promise<typeof DEFAULT_CONFIG>((r) => setTimeout(() => r(DEFAULT_CONFIG), 2000).unref?.())]).catch(() => DEFAULT_CONFIG);
     return [k, cfg.groupBots] as const;
   })));
+  // "Run batch now" spends the installation's own key, so it shows only in that installation's session view (never the operator overview).
+  const sessionKey = scoped && session === scoped ? await store.getKey(scoped) : null;
+  const flushAccess = (inst: string): FlushAccess => (scoped && session === scoped && inst === scoped ? (sessionKey ? { kind: "ready", keyLast4: sessionKey.last4 } : { kind: "no_key" }) : null);
+  const notice = flush && flushRepo && scoped && session === scoped ? { status: flush, repo: flushRepo, prs: Number(prs) || undefined, runs: Number(runs) || undefined, failed: Number(failed) || undefined } : null;
   const previews = releasePreviews(allJobs, (inst, repo) => groupBots.get(`${inst}\t${repo}`) ?? false);
   const outbox = (await store.listOutbox(scoped ?? undefined)).slice(0, 5);
   return (
@@ -56,7 +60,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           {!installs.length && <tr><td colSpan={6} className="muted">No installations yet. <a href="/setup">Install on Origin or GitHub</a>.</td></tr>}
         </tbody></table></div>
       </div>
-      <ReleasePreview previews={previews} />
+      <ReleasePreview previews={previews} flushAccess={flushAccess} notice={notice} />
       <div className="panel fade-up d2">
         <h3>Recent jobs</h3>
         <div className="table-scroll"><table><thead><tr><th>When (UTC)</th><th>Repo</th><th>PR</th><th>Kind</th><th>Mode</th><th>Status</th></tr></thead><tbody>
